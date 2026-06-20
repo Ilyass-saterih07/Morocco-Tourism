@@ -1,9 +1,10 @@
+import os
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
-import mysql.connector
+import sqlite3
 import uuid
 
 app = Flask(__name__)
-app.secret_key = 'tourism_secret_2024'
+app.secret_key = os.environ.get('SECRET_KEY', 'tourism_secret_2024')
 app.config['SESSION_PERMANENT'] = False
 
 ADMIN_USERNAME = 'admin'
@@ -329,11 +330,29 @@ translations = {
     }
 }
 
+_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.environ.get('DB_PATH', os.path.join(_APP_DIR, 'database.db'))
+
 def get_db():
-    return mysql.connector.connect(
-        host="localhost", user="root", password="", database="tourism_dinner",
-        charset='utf8mb4', use_unicode=True
-    )
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    return conn
+
+def init_db():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT count(*) FROM villes")
+        c.close(); conn.close()
+        return
+    except:
+        try: conn.close()
+        except: pass
+    import setup_db
+
+init_db()
 
 def get_lang():
     return session.get('lang', 'ar')
@@ -364,30 +383,30 @@ def qry_villes(cursor, s, extra_cols='', where='', params=()):
         sql = f"SELECT {cols} FROM villes"
         if where:
             sql += f" WHERE {where}"
-        sql += " ORDER BY note+0 DESC"
+        sql += " ORDER BY CAST(note AS REAL) DESC"
         cursor.execute(sql, params)
         return cursor.fetchall()
-    except mysql.connector.errors.ProgrammingError:
+    except sqlite3.OperationalError:
         base = f"id, nom, description{s} as description, type, distance, prix_bus, prix_taxi, image, note"
         if extra_cols:
             base += ', ' + extra_cols
         sql = f"SELECT {base} FROM villes"
         if where:
             sql += f" WHERE {where}"
-        sql += " ORDER BY note+0 DESC"
+        sql += " ORDER BY CAST(note AS REAL) DESC"
         cursor.execute(sql, params)
         return cursor.fetchall()
 
 @app.route('/')
 def home():
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
     lang = get_lang()
     s = '' if lang == 'ar' else f'_{lang}'
     type_filter = request.args.get('type')
     extra = "lat, lng, review_count, bus_duration, taxi_duration, voiture_duration"
     if type_filter:
-        villes = qry_villes(cursor, s, extra, "type=%s", (type_filter,))
+        villes = qry_villes(cursor, s, extra, "type=?", (type_filter,))
     else:
         villes = qry_villes(cursor, s, extra)
     types_list = ['Ville', 'Plage', 'Montagne', 'Desert', 'Histoire']
@@ -398,7 +417,7 @@ def home():
     cursor.execute("SELECT COUNT(*) as cnt FROM villes")
     total_villes = cursor.fetchone()['cnt']
     sid = session.get('session_id', '')
-    cursor.execute("SELECT ville_id FROM favoris WHERE session_id=%s", (sid,))
+    cursor.execute("SELECT ville_id FROM favoris WHERE session_id=?", (sid,))
     fav_ids = [r['ville_id'] for r in cursor.fetchall()]
     cursor.close()
     db.close()
@@ -407,7 +426,7 @@ def home():
 @app.route('/results')
 def results():
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
     lang = get_lang()
     s = '' if lang == 'ar' else f'_{lang}'
     q = request.args.get('q', '').strip()
@@ -416,15 +435,15 @@ def results():
     conditions = []
     params = []
     if q:
-        conditions.append(f"(nom LIKE %s OR description{s} LIKE %s)")
+        conditions.append(f"(nom LIKE ? OR description{s} LIKE ?)")
         params.extend([f'%{q}%', f'%{q}%'])
     if type_filter:
-        conditions.append("type=%s")
+        conditions.append("type=?")
         params.append(type_filter)
     where = ' AND '.join(conditions) if conditions else '1=1'
     villes = qry_villes(cursor, s, 'lat, lng, review_count, bus_duration, taxi_duration, voiture_duration', where, tuple(params))
     if guide_filter:
-        cursor.execute(f"SELECT ville_id FROM guides WHERE id=%s", (guide_filter,))
+        cursor.execute(f"SELECT ville_id FROM guides WHERE id=?", (guide_filter,))
         g = cursor.fetchone()
         if g:
             villes = [v for v in villes if v['id'] == g['ville_id']]
@@ -441,13 +460,13 @@ def results():
 @app.route('/details/<int:id>')
 def details(id):
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
     lang = get_lang()
     s = '' if lang == 'ar' else f'_{lang}'
     try:
-        cursor.execute(f"SELECT id, nom, description{s} as description, type, distance, prix_bus, prix_taxi, image, note, rating{s} as rating, atmosphere{s} as atmosphere, risques{s} as risques, activites{s} as activites, infos_utiles{s} as infos_utiles, galerie1, galerie2, galerie3, lat, lng, review_count, bus_duration, taxi_duration, voiture_duration, plats_typiques{s} as plats_typiques, population, monnaie, langues, meilleure_periode{s} as meilleure_periode FROM villes WHERE id=%s", (id,))
-    except mysql.connector.errors.ProgrammingError:
-        cursor.execute(f"SELECT id, nom, description{s} as description, type, distance, prix_bus, prix_taxi, image, note, rating{s} as rating, atmosphere{s} as atmosphere, risques{s} as risques, activites{s} as activites, infos_utiles{s} as infos_utiles, galerie1, galerie2, galerie3 FROM villes WHERE id=%s", (id,))
+        cursor.execute(f"SELECT id, nom, description{s} as description, type, distance, prix_bus, prix_taxi, image, note, rating{s} as rating, atmosphere{s} as atmosphere, risques{s} as risques, activites{s} as activites, infos_utiles{s} as infos_utiles, galerie1, galerie2, galerie3, lat, lng, review_count, bus_duration, taxi_duration, voiture_duration, plats_typiques{s} as plats_typiques, population, monnaie, langues, meilleure_periode{s} as meilleure_periode FROM villes WHERE id=?", (id,))
+    except sqlite3.OperationalError:
+        cursor.execute(f"SELECT id, nom, description{s} as description, type, distance, prix_bus, prix_taxi, image, note, rating{s} as rating, atmosphere{s} as atmosphere, risques{s} as risques, activites{s} as activites, infos_utiles{s} as infos_utiles, galerie1, galerie2, galerie3 FROM villes WHERE id=?", (id,))
     ville = cursor.fetchone()
     if not ville:
         cursor.close(); db.close()
@@ -456,23 +475,23 @@ def details(id):
     guides = []
     avis_list = []
     prix_hebergement = []
-    cursor.execute(f"SELECT id, nom{s} as nom, categorie, description{s} as description, adresse{s} as adresse, prix, image, note FROM attractions WHERE ville_id=%s ORDER BY id", (id,))
+    cursor.execute(f"SELECT id, nom{s} as nom, categorie, description{s} as description, adresse{s} as adresse, prix, image, note FROM attractions WHERE ville_id=? ORDER BY id", (id,))
     attractions = cursor.fetchall()
     gs = '' if lang == 'fr' else f'_{lang}'
-    cursor.execute(f"SELECT id, nom{gs} as nom, specialite{gs} as specialite, prix, telephone, image FROM guides WHERE ville_id=%s", (id,))
+    cursor.execute(f"SELECT id, nom{gs} as nom, specialite{gs} as specialite, prix, telephone, image FROM guides WHERE ville_id=?", (id,))
     guides = cursor.fetchall()
     try:
-        cursor.execute("SELECT id, auteur, note, commentaire, date_post FROM avis WHERE ville_id=%s ORDER BY date_post DESC", (id,))
+        cursor.execute("SELECT id, auteur, note, commentaire, date_post FROM avis WHERE ville_id=? ORDER BY date_post DESC", (id,))
         avis_list = cursor.fetchall()
-    except mysql.connector.errors.ProgrammingError:
+    except sqlite3.OperationalError:
         pass
     try:
-        cursor.execute("SELECT type_hebergement, prix_par_nuit FROM ville_prix_hebergement WHERE ville_id=%s ORDER BY prix_par_nuit ASC", (id,))
+        cursor.execute("SELECT type_hebergement, prix_par_nuit FROM ville_prix_hebergement WHERE ville_id=? ORDER BY prix_par_nuit ASC", (id,))
         prix_hebergement = cursor.fetchall()
-    except mysql.connector.errors.ProgrammingError:
+    except sqlite3.OperationalError:
         pass
     sid = session.get('session_id', '')
-    cursor.execute("SELECT ville_id FROM favoris WHERE session_id=%s AND ville_id=%s", (sid, id))
+    cursor.execute("SELECT ville_id FROM favoris WHERE session_id=? AND ville_id=?", (sid, id))
     is_fav = cursor.fetchone() is not None
     cursor.close()
     db.close()
@@ -481,12 +500,12 @@ def details(id):
 @app.route('/api/generate_itinerary/<int:ville_id>')
 def generate_itinerary(ville_id):
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
     lang = get_lang()
     s = '' if lang == 'ar' else f'_{lang}'
     days = request.args.get('days', 3, type=int)
     days = max(1, min(days, 30))
-    cursor.execute(f"SELECT id, nom{s} as nom, categorie, description{s} as description, adresse{s} as adresse, prix, image, note FROM attractions WHERE ville_id=%s AND categorie NOT IN ('hotel','pharmacie')", (ville_id,))
+    cursor.execute(f"SELECT id, nom{s} as nom, categorie, description{s} as description, adresse{s} as adresse, prix, image, note FROM attractions WHERE ville_id=? AND categorie NOT IN ('hotel','pharmacie')", (ville_id,))
     all_attractions = cursor.fetchall()
     cursor.close()
     db.close()
@@ -509,15 +528,15 @@ def generate_itinerary(ville_id):
         slots.append({'time': '09:00', 'icon': '🥐', 'label': m['breakfast'], 'type': 'meal'})
         if len(day_sights) > 0:
             s2 = day_sights[0]
-            slots.append({'time': '10:00', 'icon': '📍', 'label': s2['nom'], 'desc': s2.get('description', ''), 'prix': s2.get('prix', ''), 'type': 'attraction', 'id': s2['id']})
+            slots.append({'time': '10:00', 'icon': '📍', 'label': s2['nom'], 'desc': s2['description'] or '', 'prix': s2['prix'] or '', 'type': 'attraction', 'id': s2['id']})
         lunch_place = day_restaurants[0] if len(day_restaurants) > 0 else None
         if lunch_place:
-            slots.append({'time': '13:00', 'icon': '🍽️', 'label': m['lunch'] + ' - ' + lunch_place['nom'], 'prix': lunch_place.get('prix', ''), 'type': 'attraction', 'id': lunch_place['id']})
+            slots.append({'time': '13:00', 'icon': '🍽️', 'label': m['lunch'] + ' - ' + lunch_place['nom'], 'prix': lunch_place['prix'] or '', 'type': 'attraction', 'id': lunch_place['id']})
         else:
             slots.append({'time': '13:00', 'icon': '🍽️', 'label': m['lunch'], 'type': 'meal'})
         if len(day_sights) > 1:
             s3 = day_sights[1]
-            slots.append({'time': '15:00', 'icon': '📍', 'label': s3['nom'], 'desc': s3.get('description', ''), 'prix': s3.get('prix', ''), 'type': 'attraction', 'id': s3['id']})
+            slots.append({'time': '15:00', 'icon': '📍', 'label': s3['nom'], 'desc': s3['description'] or '', 'prix': s3['prix'] or '', 'type': 'attraction', 'id': s3['id']})
         if lang == 'ar':
             day_summary_lbl = 'استكشاف المدينة'
         elif lang == 'fr':
@@ -535,22 +554,22 @@ def generate_itinerary(ville_id):
             si = min(si, len(sights) - 1) if sights else 0
             if sights and si < len(sights):
                 s2 = sights[si]
-                slots.append({'time': '10:00', 'icon': '📍', 'label': s2['nom'], 'desc': s2.get('description', ''), 'prix': s2.get('prix', ''), 'type': 'attraction', 'id': s2['id']})
+                slots.append({'time': '10:00', 'icon': '📍', 'label': s2['nom'], 'desc': s2['description'] or '', 'prix': s2['prix'] or '', 'type': 'attraction', 'id': s2['id']})
             ri = d * rest_per_day
             ri = min(ri, len(restaurants) - 1) if restaurants else 0
             if restaurants and ri < len(restaurants):
                 lunch_place = restaurants[ri]
-                slots.append({'time': '13:00', 'icon': '🍽️', 'label': m['lunch'] + ' - ' + lunch_place['nom'], 'prix': lunch_place.get('prix', ''), 'type': 'attraction', 'id': lunch_place['id']})
+                slots.append({'time': '13:00', 'icon': '🍽️', 'label': m['lunch'] + ' - ' + lunch_place['nom'], 'prix': lunch_place['prix'] or '', 'type': 'attraction', 'id': lunch_place['id']})
             else:
                 slots.append({'time': '13:00', 'icon': '🍽️', 'label': m['lunch'], 'type': 'meal'})
             si2 = si + 1
             if sights and si2 < len(sights):
                 s3 = sights[si2]
-                slots.append({'time': '15:00', 'icon': '📍', 'label': s3['nom'], 'desc': s3.get('description', ''), 'prix': s3.get('prix', ''), 'type': 'attraction', 'id': s3['id']})
+                slots.append({'time': '15:00', 'icon': '📍', 'label': s3['nom'], 'desc': s3['description'] or '', 'prix': s3['prix'] or '', 'type': 'attraction', 'id': s3['id']})
             ri2 = ri + 1
             if restaurants and ri2 < len(restaurants):
                 dinner_place = restaurants[ri2]
-                slots.append({'time': '20:00', 'icon': '🌙', 'label': m['dinner'] + ' - ' + dinner_place['nom'], 'prix': dinner_place.get('prix', ''), 'type': 'attraction', 'id': dinner_place['id']})
+                slots.append({'time': '20:00', 'icon': '🌙', 'label': m['dinner'] + ' - ' + dinner_place['nom'], 'prix': dinner_place['prix'] or '', 'type': 'attraction', 'id': dinner_place['id']})
             else:
                 slots.append({'time': '20:00', 'icon': '🌙', 'label': m['dinner'], 'type': 'meal'})
             if lang == 'ar':
@@ -565,15 +584,15 @@ def generate_itinerary(ville_id):
 @app.route('/explore/<int:id>')
 def explore(id):
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
     lang = get_lang()
     s = '' if lang == 'ar' else f'_{lang}'
-    cursor.execute(f"SELECT id, nom, description{s} as description, type, distance, prix_bus, prix_taxi, image FROM villes WHERE id=%s", (id,))
+    cursor.execute(f"SELECT id, nom, description{s} as description, type, distance, prix_bus, prix_taxi, image FROM villes WHERE id=?", (id,))
     ville = cursor.fetchone()
     if not ville:
         cursor.close(); db.close()
         return '<h1>404 - Ville non trouvée</h1>', 404
-    cursor.execute(f"SELECT id, ville_id, nom{s} as nom, categorie, description{s} as description, adresse{s} as adresse, prix, image, note FROM attractions WHERE ville_id=%s ORDER BY categorie", (id,))
+    cursor.execute(f"SELECT id, ville_id, nom{s} as nom, categorie, description{s} as description, adresse{s} as adresse, prix, image, note FROM attractions WHERE ville_id=? ORDER BY categorie", (id,))
     attractions = cursor.fetchall()
     cursor.close()
     db.close()
@@ -582,13 +601,13 @@ def explore(id):
 @app.route('/attraction/<int:id>')
 def attraction_detail(id):
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
     lang = get_lang()
     s = '' if lang == 'ar' else f'_{lang}'
     if lang == 'ar': ms = '_ar'
     elif lang == 'en': ms = '_en'
     else: ms = ''
-    cursor.execute(f"SELECT a.id, a.ville_id, a.nom{s} as nom, a.categorie, a.description{s} as description, a.adresse{s} as adresse, a.prix, a.image, a.note, v.nom as ville_nom FROM attractions a JOIN villes v ON a.ville_id = v.id WHERE a.id=%s", (id,))
+    cursor.execute(f"SELECT a.id, a.ville_id, a.nom{s} as nom, a.categorie, a.description{s} as description, a.adresse{s} as adresse, a.prix, a.image, a.note, v.nom as ville_nom FROM attractions a JOIN villes v ON a.ville_id = v.id WHERE a.id=?", (id,))
     a = cursor.fetchone()
     menu_items = []
     hotel_rooms = []
@@ -596,10 +615,10 @@ def attraction_detail(id):
         cursor.close(); db.close()
         return '<h1>404 - Attraction non trouvée</h1>', 404
     if a['categorie'] == 'restaurant':
-        cursor.execute(f"SELECT id, attraction_id, nom_item{ms} as nom_item, prix, description{ms} as description FROM menu_items WHERE attraction_id=%s ORDER BY id", (id,))
+        cursor.execute(f"SELECT id, attraction_id, nom_item{ms} as nom_item, prix, description{ms} as description FROM menu_items WHERE attraction_id=? ORDER BY id", (id,))
         menu_items = cursor.fetchall()
     elif a['categorie'] == 'hotel':
-        cursor.execute(f"SELECT id, attraction_id, type_chambre{ms} as type_chambre, prix, description{ms} as description, capacite FROM hotel_rooms WHERE attraction_id=%s ORDER BY id", (id,))
+        cursor.execute(f"SELECT id, attraction_id, type_chambre{ms} as type_chambre, prix, description{ms} as description, capacite FROM hotel_rooms WHERE attraction_id=? ORDER BY id", (id,))
         hotel_rooms = cursor.fetchall()
     cursor.close()
     db.close()
@@ -608,13 +627,13 @@ def attraction_detail(id):
 @app.route('/reserver_attraction/<int:id>', methods=['GET', 'POST'])
 def reserver_attraction(id):
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
     lang = get_lang()
     s = '' if lang == 'ar' else f'_{lang}'
     if lang == 'ar': ms = '_ar'
     elif lang == 'en': ms = '_en'
     else: ms = ''
-    cursor.execute(f"SELECT a.id, a.ville_id, a.nom{s} as nom, a.categorie, a.description{s} as description, a.adresse{s} as adresse, a.prix, a.image, a.note, v.nom as ville_nom FROM attractions a JOIN villes v ON a.ville_id = v.id WHERE a.id=%s", (id,))
+    cursor.execute(f"SELECT a.id, a.ville_id, a.nom{s} as nom, a.categorie, a.description{s} as description, a.adresse{s} as adresse, a.prix, a.image, a.note, v.nom as ville_nom FROM attractions a JOIN villes v ON a.ville_id = v.id WHERE a.id=?", (id,))
     a = cursor.fetchone()
     if not a:
         cursor.close(); db.close()
@@ -622,10 +641,10 @@ def reserver_attraction(id):
     menu_items = []
     hotel_rooms = []
     if a['categorie'] == 'restaurant':
-        cursor.execute(f"SELECT id, nom_item{ms} as nom_item, prix, description{ms} as description FROM menu_items WHERE attraction_id=%s ORDER BY id", (id,))
+        cursor.execute(f"SELECT id, nom_item{ms} as nom_item, prix, description{ms} as description FROM menu_items WHERE attraction_id=? ORDER BY id", (id,))
         menu_items = cursor.fetchall()
     elif a['categorie'] == 'hotel':
-        cursor.execute(f"SELECT id, type_chambre{ms} as type_chambre, prix, description{ms} as description, capacite FROM hotel_rooms WHERE attraction_id=%s ORDER BY id", (id,))
+        cursor.execute(f"SELECT id, type_chambre{ms} as type_chambre, prix, description{ms} as description, capacite FROM hotel_rooms WHERE attraction_id=? ORDER BY id", (id,))
         hotel_rooms = cursor.fetchall()
     if request.method == 'POST':
         nom = request.form.get('nom', '')
@@ -638,7 +657,7 @@ def reserver_attraction(id):
         selected_items = request.form.get('selected_items', '')
         details = selected_items if selected_items else None
         cursor.execute(
-            "INSERT INTO attraction_reservations (attraction_id, attraction_nom, ville_nom, nom_client, email, telephone, card_last4, date_depart, personnes, details) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            "INSERT INTO attraction_reservations (attraction_id, attraction_nom, ville_nom, nom_client, email, telephone, card_last4, date_depart, personnes, details) VALUES (?,?,?,?,?,?,?,?,?,?)",
             (id, a['nom'], a['ville_nom'], nom, email, telephone, card_last4, date_depart, personnes, details)
         )
         db.commit()
@@ -653,10 +672,10 @@ def reserver_attraction(id):
 @app.route('/reservation/<int:id>', methods=['GET', 'POST'])
 def reservation(id):
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
     lang = get_lang()
     s = '' if lang == 'ar' else f'_{lang}'
-    cursor.execute(f"SELECT id, nom, description{s} as description, type, distance, prix_bus, prix_taxi, image, note FROM villes WHERE id=%s", (id,))
+    cursor.execute(f"SELECT id, nom, description{s} as description, type, distance, prix_bus, prix_taxi, image, note FROM villes WHERE id=?", (id,))
     ville = cursor.fetchone()
     if not ville:
         cursor.close(); db.close()
@@ -672,7 +691,7 @@ def reservation(id):
         card_number = request.form.get('card_number', '')
         card_last4 = card_number[-4:] if len(card_number) >= 4 else ''
         cursor.execute(
-            "INSERT INTO reservations (nom_client, ville, email, telephone, card_last4, date_depart, personnes) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+            "INSERT INTO reservations (nom_client, ville, email, telephone, card_last4, date_depart, personnes) VALUES (?,?,?,?,?,?,?)",
             (nom, ville['nom'], email, telephone, card_last4, date_depart, personnes)
         )
         db.commit()
@@ -681,14 +700,14 @@ def reservation(id):
         return {'success': True, 'ville': ville['nom'], 'nom': nom, 'email': email, 'date_depart': date_depart, 'personnes': personnes}
     prix_hebergement = []
     try:
-        cursor.execute("SELECT type_hebergement, prix_par_nuit FROM ville_prix_hebergement WHERE ville_id=%s ORDER BY prix_par_nuit ASC", (id,))
+        cursor.execute("SELECT type_hebergement, prix_par_nuit FROM ville_prix_hebergement WHERE ville_id=? ORDER BY prix_par_nuit ASC", (id,))
         prix_hebergement = cursor.fetchall()
-    except mysql.connector.errors.ProgrammingError:
+    except sqlite3.OperationalError:
         pass
     gs = '' if lang == 'fr' else f'_{lang}'
     cursor.execute(f"SELECT id, nom, nom_fr, nom_en FROM villes ORDER BY id")
     all_villes = cursor.fetchall()
-    cursor.execute(f"SELECT id, nom{gs} as nom, specialite{gs} as specialite, prix, telephone, image FROM guides WHERE ville_id=%s", (id,))
+    cursor.execute(f"SELECT id, nom{gs} as nom, specialite{gs} as specialite, prix, telephone, image FROM guides WHERE ville_id=?", (id,))
     guides = cursor.fetchall()
     cursor.close()
     db.close()
@@ -711,7 +730,7 @@ def reservation(id):
 @app.route('/search')
 def search():
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
     lang = get_lang()
     s = '' if lang == 'ar' else f'_{lang}'
     q = request.args.get('q', '').strip()
@@ -720,15 +739,15 @@ def search():
     conditions = []
     params = []
     if q:
-        conditions.append(f"(nom LIKE %s OR description{s} LIKE %s)")
+        conditions.append(f"(nom LIKE ? OR description{s} LIKE ?)")
         params.extend([f'%{q}%', f'%{q}%'])
     if type_filter:
-        conditions.append("type=%s")
+        conditions.append("type=?")
         params.append(type_filter)
     where = ' AND '.join(conditions) if conditions else '1=1'
     villes = qry_villes(cursor, s, 'lat, lng, review_count, bus_duration, taxi_duration, voiture_duration', where, tuple(params))
     if guide_filter:
-        cursor.execute(f"SELECT ville_id FROM guides WHERE id=%s", (guide_filter,))
+        cursor.execute(f"SELECT ville_id FROM guides WHERE id=?", (guide_filter,))
         g = cursor.fetchone()
         if g:
             villes = [v for v in villes if v['id'] == g['ville_id']]
@@ -744,13 +763,13 @@ def search():
 @app.route('/api/villes')
 def api_villes():
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
     lang = get_lang()
     s = '' if lang == 'ar' else f'_{lang}'
     villes = qry_villes(cursor, s, 'lat, lng, population, monnaie, langues')
     cursor.close()
     db.close()
-    return jsonify(villes)
+    return jsonify([dict(v) for v in villes])
 
 @app.route('/api/prix-estimation', methods=['POST'])
 def api_prix_estimation():
@@ -766,30 +785,30 @@ def api_prix_estimation():
     guide_id = data.get('guide_id')
     depart_ville_id = data.get('depart_ville_id')
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
     if depart_ville_id and int(depart_ville_id) == int(ville_id):
         transport_price = 0
     else:
-        cursor.execute("SELECT prix_bus, prix_taxi FROM villes WHERE id=%s", (ville_id,))
+        cursor.execute("SELECT prix_bus, prix_taxi FROM villes WHERE id=?", (ville_id,))
         v = cursor.fetchone()
         if not v:
             cursor.close(); db.close()
             return jsonify({'transport':0,'accommodation':0,'guide':0,'total':0})
-        bus_m = re.search(r'(\d+)\s*DH', v['prix_bus']) if v.get('prix_bus') else None
+        bus_m = re.search(r'(\d+)\s*DH', v['prix_bus']) if v['prix_bus'] else None
         bus_val = int(bus_m.group(1)) if bus_m else 0
-        taxi_m = re.search(r'(\d+)\s*DH', v['prix_taxi']) if v.get('prix_taxi') else None
+        taxi_m = re.search(r'(\d+)\s*DH', v['prix_taxi']) if v['prix_taxi'] else None
         taxi_val = int(taxi_m.group(1)) if taxi_m else 0
         transport_price = (bus_val if transport_type == 'bus' else taxi_val) * nb_personnes
     accom_price = 0
     try:
-        cursor.execute("SELECT prix_par_nuit FROM ville_prix_hebergement WHERE ville_id=%s AND type_hebergement=%s", (ville_id, accommodation_type))
+        cursor.execute("SELECT prix_par_nuit FROM ville_prix_hebergement WHERE ville_id=? AND type_hebergement=?", (ville_id, accommodation_type))
         ph = cursor.fetchone()
         accom_price = float(ph['prix_par_nuit']) * nb_personnes * nb_jours if ph else 0
-    except mysql.connector.errors.ProgrammingError:
+    except sqlite3.OperationalError:
         pass
     guide_price = 0
     if guide_id:
-        cursor.execute("SELECT prix FROM guides WHERE id=%s", (guide_id,))
+        cursor.execute("SELECT prix FROM guides WHERE id=?", (guide_id,))
         g = cursor.fetchone()
         if g:
             gm = re.search(r'(\d+(?:\.\d+)?)', g['prix'])
@@ -806,13 +825,13 @@ def toggle_favori(ville_id):
         return jsonify({'error': 'no session'})
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT id FROM favoris WHERE session_id=%s AND ville_id=%s", (sid, ville_id))
+    cursor.execute("SELECT id FROM favoris WHERE session_id=? AND ville_id=?", (sid, ville_id))
     existing = cursor.fetchone()
     if existing:
-        cursor.execute("DELETE FROM favoris WHERE id=%s", (existing[0],))
+        cursor.execute("DELETE FROM favoris WHERE id=?", (existing[0],))
         is_fav = False
     else:
-        cursor.execute("INSERT INTO favoris (session_id, ville_id) VALUES (%s, %s)", (sid, ville_id))
+        cursor.execute("INSERT INTO favoris (session_id, ville_id) VALUES (?, ?)", (sid, ville_id))
         is_fav = True
     db.commit()
     cursor.close()
@@ -840,7 +859,7 @@ def admin():
     if not session.get('admin'):
         return redirect(url_for('login'))
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
     cursor.execute("SELECT COUNT(*) as total FROM villes")
     total_villes = cursor.fetchone()['total']
     cursor.execute("SELECT COUNT(*) as total FROM reservations")
@@ -858,7 +877,7 @@ def admin():
     top_ville = top_row['nom'] if top_row else '—'
     cursor.execute("SELECT AVG(personnes) as avg FROM reservations")
     avg_personnes = round(cursor.fetchone()['avg'] or 0, 1)
-    cursor.execute("SELECT COUNT(*) as total FROM reservations WHERE DATE(date_depart) = CURDATE()")
+    cursor.execute("SELECT COUNT(*) as total FROM reservations WHERE DATE(date_depart) = DATE('now')")
     today_reservations = cursor.fetchone()['total']
     cursor.execute("SELECT id, nom, type, image FROM villes ORDER BY id ASC")
     villes = cursor.fetchall()
@@ -883,7 +902,7 @@ def delete_reservation(id):
         return redirect(url_for('login'))
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("DELETE FROM reservations WHERE id=%s", (id,))
+    cursor.execute("DELETE FROM reservations WHERE id=?", (id,))
     db.commit()
     cursor.close()
     db.close()
@@ -895,9 +914,9 @@ def delete_ville(id):
         return redirect(url_for('login'))
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("DELETE FROM reservations WHERE ville=(SELECT nom FROM villes WHERE id=%s)", (id,))
-    cursor.execute("DELETE FROM attractions WHERE ville_id=%s", (id,))
-    cursor.execute("DELETE FROM villes WHERE id=%s", (id,))
+    cursor.execute("DELETE FROM reservations WHERE ville=(SELECT nom FROM villes WHERE id=?)", (id,))
+    cursor.execute("DELETE FROM attractions WHERE ville_id=?", (id,))
+    cursor.execute("DELETE FROM villes WHERE id=?", (id,))
     db.commit()
     cursor.close()
     db.close()
@@ -911,9 +930,9 @@ def add_ville():
     if request.method == 'POST':
         try:
             db = get_db()
-            cursor = db.cursor(dictionary=True)
+            cursor = db.cursor()
             cursor.execute(
-                "INSERT INTO villes (nom, description, description_fr, description_en, type, distance, prix_bus, prix_taxi, image) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                "INSERT INTO villes (nom, description, description_fr, description_en, type, distance, prix_bus, prix_taxi, image) VALUES (?,?,?,?,?,?,?,?,?)",
                 (request.form['nom'], request.form['description'], request.form.get('description_fr', ''), request.form.get('description_en', ''), request.form['type'],
                  request.form['distance'], request.form['prix_bus'], request.form['prix_taxi'], request.form['image'])
             )
