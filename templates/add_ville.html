@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ t.add_city_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="logo">Tourism<span>Dinner</span></div>
+    <div class="nav-links">
+        <a href="/">{{ t.home }}</a>
+        <a href="/admin" style="color:#22c55e">{{ t.admin }}</a>
+        <a href="/set_lang/ar" class="{{ 'lang-active' if lang == 'ar' }}">ع</a>
+        <a href="/set_lang/fr" class="{{ 'lang-active' if lang == 'fr' }}">FR</a>
+        <a href="/set_lang/en" class="{{ 'lang-active' if lang == 'en' }}">EN</a>
+        <a href="/logout" style="color:red">{{ t.logout }}</a>
+    </div>
+</nav>
+
+<div class="reservation-container">
+    <form method="POST" class="reservation-form">
+        <h1>➕ {{ t.add_city_title }}</h1>
+        {% if msg %}
+        <p style="color:red;font-size:14px;background:#fee;padding:12px;border-radius:12px;">{{ msg }}</p>
+        {% endif %}
+        <input type="text" name="nom" placeholder="{{ t.city_name }}" required>
+        <textarea name="description" placeholder="{{ t.description }}" required
+            style="padding:14px 16px; border:1.5px solid #e5e7eb; border-radius:12px;
+                   font-size:15px; outline:none; resize:vertical; min-height:100px;
+                   font-family:inherit; color:#111;"></textarea>
+        <select name="type">
+            <option value="Ville">Ville</option>
+            <option value="Plage">Plage</option>
+            <option value="Montagne">Montagne</option>
+            <option value="Desert">Désert</option>
+            <option value="Histoire">Histoire</option>
+        </select>
+        <input type="text" name="distance" placeholder="{{ t.distance }} (ex: 500 km)" required>
+        <input type="text" name="prix_bus" placeholder="{{ t.bus }} (ex: 100 DH)" required>
+        <input type="text" name="prix_taxi" placeholder="{{ t.taxi }} (ex: 300 DH)" required>
+        <input type="text" name="image" placeholder="{{ t.image_url }}" required>
+        <button type="submit">{{ t.add_btn }}</button>
+    </form>
+</div>
+
+<button class="scroll-top" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+<script>
+window.addEventListener('scroll', function() {
+    const btn = document.getElementById('scrollTopBtn');
+    if (btn) btn.classList.toggle('show', window.scrollY > 300);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ t.login_title }} — Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .login-page { min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#0a0a0a 0%,#1a1a2e 100%); padding:20px; }
+        .login-card { background:rgba(255,255,255,0.04); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.08); border-radius:28px; padding:50px 44px; width:100%; max-width:420px; box-shadow:0 25px 80px rgba(0,0,0,0.5); text-align:center; }
+        .login-card .icon { font-size:56px; margin-bottom:12px; }
+        .login-card h1 { color:white; font-size:28px; font-weight:800; letter-spacing:-.5px; margin-bottom:6px; }
+        .login-card h1 span { color:#22c55e; }
+        .login-card .sub { color:rgba(255,255,255,0.4); font-size:14px; margin-bottom:30px; }
+        .login-card .error-msg { background:rgba(239,68,68,0.15); color:#fca5a5; padding:12px 16px; border-radius:12px; font-size:14px; font-weight:600; margin-bottom:20px; border:1px solid rgba(239,68,68,0.2); }
+        .login-card input { width:100%; padding:16px 18px; border-radius:14px; border:1.5px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.05); color:white; font-size:15px; outline:none; transition:all .2s; margin-bottom:14px; }
+        .login-card input::placeholder { color:rgba(255,255,255,0.3); }
+        .login-card input:focus { border-color:#22c55e; background:rgba(255,255,255,0.08); box-shadow:0 0 0 4px rgba(34,197,94,0.1); }
+        .login-card button { width:100%; padding:16px; border-radius:14px; border:none; background:#22c55e; color:white; font-size:16px; font-weight:700; cursor:pointer; transition:all .2s; box-shadow:0 4px 20px rgba(34,197,94,0.3); margin-top:4px; }
+        .login-card button:hover { transform:translateY(-2px); box-shadow:0 8px 30px rgba(34,197,94,0.4); }
+        .login-card .back-link { display:inline-block; margin-top:20px; color:rgba(255,255,255,0.3); font-size:13px; text-decoration:none; transition:color .2s; }
+        .login-card .back-link:hover { color:rgba(255,255,255,0.6); }
+        .login-nav { position:fixed; top:0; width:100%; padding:18px 40px; display:flex; justify-content:space-between; align-items:center; z-index:100; }
+        .login-nav .logo { font-size:22px; font-weight:800; color:white; letter-spacing:-.5px; }
+        .login-nav .logo span { color:#22c55e; }
+        .login-nav a { color:rgba(255,255,255,0.5); text-decoration:none; font-size:13px; font-weight:600; margin-left:20px; transition:color .2s; }
+        .login-nav a:hover { color:#22c55e; }
+    </style>
+</head>
+<body>
+<div class="login-nav">
+    <div class="logo">Tourism<span>Dinner</span></div>
+    <div>
+        <a href="/">{{ t.home }}</a>
+        <a href="/set_lang/ar">ع</a>
+        <a href="/set_lang/fr">FR</a>
+        <a href="/set_lang/en">EN</a>
+    </div>
+</div>
+<div class="login-page">
+    <div class="login-card">
+        <div class="icon">🔐</div>
+        <h1>{{ t.login_title }} <span>Admin</span></h1>
+        <div class="sub">Tourism Dinner</div>
+        {% if error %}
+            <div class="error-msg">{{ error }}</div>
+        {% endif %}
+        <form method="POST">
+            <input type="text" name="username" placeholder="{{ t.username }}" required autocomplete="off">
+            <input type="password" name="password" placeholder="{{ t.password }}" required>
+            <button type="submit">{{ t.login_btn }}</button>
+        </form>
+        <a href="/" class="back-link">← {{ t.home }}</a>
+    </div>
+</div>
+</body>
+</html>

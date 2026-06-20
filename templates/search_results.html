@@ -1,0 +1,121 @@
+﻿<!DOCTYPE html>
+<html dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ t.search_results_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .search-header { text-align:center; padding:30px 30px 10px; }
+        .search-header h1 { font-size:30px; font-weight:800; color:#111; margin-bottom:6px; }
+        .search-header p { color:#888; font-size:15px; }
+        .search-filters { display:flex; gap:12px; justify-content:center; padding:0 30px 20px; flex-wrap:wrap; }
+        .search-filters form { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+        .search-filters input,.search-filters select { padding:12px 18px; border:1.5px solid #e5e7eb; border-radius:12px; font-size:14px; outline:none; color:#333; background:white; }
+        .search-filters input:focus,.search-filters select:focus { border-color:#22c55e; }
+        .search-filters button { padding:12px 24px; border-radius:12px; background:#22c55e; color:white; border:none; font-size:14px; font-weight:700; cursor:pointer; }
+        .search-filters button:hover { background:#16a34a; }
+        .no-results { text-align:center; padding:60px 30px; color:#888; }
+        .no-results h2 { font-size:28px; font-weight:800; color:#111; margin-bottom:10px; }
+        .no-results p { font-size:16px; }
+        .rating-badge { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:700; color:#f59e0b; background:#fffbeb; padding:3px 10px; border-radius:20px; margin-left:6px; }
+        .card-desc { font-size:13px; color:#666; margin:8px 0; line-height:1.5; }
+        .card-transport { display:flex; gap:10px; flex-wrap:wrap; margin:8px 0; }
+        .card-transport span { font-size:11px; font-weight:600; color:#555; background:#f4f4f4; padding:3px 10px; border-radius:10px; }
+    </style>
+</head>
+<body>
+<nav class="navbar">
+    <div class="logo">Tourism<span>Dinner</span></div>
+    <div class="nav-links">
+        <a href="/">{{ t.home }}</a>
+        <a href="/admin">{{ t.admin }}</a>
+        <a href="/set_lang/ar" class="{{ 'lang-active' if lang == 'ar' }}">ع</a>
+        <a href="/set_lang/fr" class="{{ 'lang-active' if lang == 'fr' }}">FR</a>
+        <a href="/set_lang/en" class="{{ 'lang-active' if lang == 'en' }}">EN</a>
+    </div>
+</nav>
+
+<div class="search-header">
+    <h1>{{ t.search_results_title }}</h1>
+    {% if q or type_filter or guide_filter %}
+    <p>
+        {% if q %}"{{ q }}"{% endif %}
+        {% if type_filter %}— {{ t.filter_type }}: {{ type_filter }}{% endif %}
+        {% if guide_filter %}— {{ t.filter_guide }}: {{ guide_filter }}{% endif %}
+    </p>
+    {% endif %}
+</div>
+
+<div class="search-filters">
+    <form action="/results" method="GET">
+        <input type="text" name="q" value="{{ q }}" placeholder="{{ t.search_placeholder }}">
+        <select name="type">
+            <option value="">{{ t.filter_type }}</option>
+            <option value="Ville" {{ 'selected' if type_filter=='Ville' }}>{{ t.type_ville }}</option>
+            <option value="Plage" {{ 'selected' if type_filter=='Plage' }}>{{ t.type_plage }}</option>
+            <option value="Montagne" {{ 'selected' if type_filter=='Montagne' }}>{{ t.type_montagne }}</option>
+            <option value="Desert" {{ 'selected' if type_filter=='Desert' }}>{{ t.type_desert }}</option>
+            <option value="Histoire" {{ 'selected' if type_filter=='Histoire' }}>{{ t.type_histoire }}</option>
+        </select>
+        <select name="guide">
+            <option value="">{{ t.filter_guide }}</option>
+            {% for g in all_guides %}
+            <option value="{{ g.id }}" {{ 'selected' if guide_filter==g.id|string }}>{{ g.nom }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">{{ t.search_btn }}</button>
+    </form>
+</div>
+
+<div id="results">
+    {% for ville in villes %}
+    <div class="card">
+        <div class="card-img-wrap">
+            <img src="{{ ville.image }}" alt="{{ ville.nom }}">
+        </div>
+        <div class="card-body">
+            <div class="card-header">
+                <h2 style="flex:1">{{ ville.nom }}</h2>
+            </div>
+            <span class="card-type"
+                {% if ville.type == 'Desert' or ville.type == 'Désert' %}style="background:#fef9c3;color:#854d0e"
+                {% elif ville.type == 'Plage' %}style="background:#dbeafe;color:#1e40af"
+                {% elif ville.type == 'Montagne' %}style="background:#ffedd5;color:#9a3412"
+                {% elif ville.type == 'Histoire' %}style="background:#fce7f3;color:#9d174d"
+                {% endif %}>
+                {% if ville.type == 'Desert' or ville.type == 'Désert' %}{{ t.type_desert }}
+                {% elif ville.type == 'Plage' %}{{ t.type_plage }}
+                {% elif ville.type == 'Montagne' %}{{ t.type_montagne }}
+                {% elif ville.type == 'Histoire' %}{{ t.type_histoire }}
+                {% else %}{{ t.type_ville }}{% endif %}
+            </span>
+            {% if ville.note %}
+            <span class="rating-badge">⭐ {{ ville.note }}</span>
+            {% endif %}
+            <div class="card-desc">{{ ville.description[:120] if ville.description else '' }}...</div>
+            <div class="card-transport">
+                {% if ville.bus_duration %}<span>🚌 {{ ville.bus_duration }}</span>{% endif %}
+                {% if ville.taxi_duration %}<span>🚕 {{ ville.taxi_duration }}</span>{% endif %}
+                {% if ville.voiture_duration %}<span>🚗 {{ ville.voiture_duration }}</span>{% endif %}
+                <span>📍 {{ ville.distance }}</span>
+            </div>
+            <a href="/details/{{ ville.id }}" class="btn-primary" style="display:inline-block;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;background:#22c55e;color:white;text-decoration:none;margin-top:6px;">{{ t.voir_details }}</a>
+        </div>
+    </div>
+    {% else %}
+    <div class="no-results">
+        <h2>🔍 {{ t.no_results }}</h2>
+        <p>{{ t.search_placeholder }}</p>
+    </div>
+    {% endfor %}
+</div>
+
+<button class="scroll-top" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+<script>
+window.addEventListener('scroll', function() {
+    const btn = document.getElementById('scrollTopBtn');
+    if (btn) btn.classList.toggle('show', window.scrollY > 300);
+});
+</script>
+</body>
+</html>

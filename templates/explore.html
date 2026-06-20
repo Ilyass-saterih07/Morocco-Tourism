@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ ville.nom }} - Explore</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .explore-hero { height:350px; background-image:url('{{ ville.image }}'); background-size:cover; background-position:center; position:relative; display:flex; align-items:flex-end; }
+        .explore-hero::before { content:''; position:absolute; inset:0; background:linear-gradient(to top,rgba(0,0,0,0.8),transparent); }
+        .explore-hero-text { position:relative; color:white; padding:30px 40px; }
+        .explore-hero-text h1 { font-size:42px; font-weight:800; letter-spacing:-1px; }
+        .explore-hero-text p { color:#ccc; font-size:16px; }
+        .tabs { display:flex; gap:10px; padding:30px 30px 0; flex-wrap:wrap; }
+        .tab-btn { padding:10px 22px; border-radius:30px; border:2px solid #e5e7eb; background:white; font-size:14px; font-weight:700; cursor:pointer; transition:all .2s; color:#555; }
+        .tab-btn:hover,.tab-btn.active { background:#22c55e; border-color:#22c55e; color:white; }
+        .attractions-grid { display:flex; flex-wrap:wrap; gap:24px; padding:24px 30px 50px; }
+        .attraction-card { width:300px; background:white; border-radius:20px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.08); transition:transform .3s,box-shadow .3s; }
+        .attraction-card:hover { transform:translateY(-8px); box-shadow:0 16px 40px rgba(0,0,0,.15); }
+        .attraction-card img { width:100%; height:180px; object-fit:cover; }
+        .attraction-body { padding:18px; }
+        .attraction-body h3 { font-size:17px; font-weight:800; color:#111; margin-bottom:6px; }
+        .attraction-body p { font-size:13px; color:#666; line-height:1.6; margin-bottom:10px; }
+        .attraction-meta { display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#888; border-top:1px solid #f0f0f0; padding-top:10px; margin-top:8px; }
+        .attraction-price { font-weight:700; color:#22c55e; }
+        .attraction-note { font-weight:700; color:#f59e0b; }
+        .cat-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; margin-bottom:8px; }
+        .cat-restaurant { background:#fef9c3; color:#854d0e; } .cat-hotel { background:#dbeafe; color:#1e40af; }
+        .cat-musee { background:#fce7f3; color:#9d174d; } .cat-pharmacie { background:#dcfce7; color:#166534; }
+        .cat-lieu { background:#ffedd5; color:#9a3412; }
+        .back-btn { display:inline-flex; align-items:center; gap:8px; margin:20px 30px 0; padding:12px 24px; background:#111; color:white; border-radius:12px; text-decoration:none; font-weight:700; font-size:14px; transition:background .2s,gap .2s; }
+        .back-btn:hover { background:#22c55e; gap:14px; }
+        .back-btn .arr { display:inline-block; font-size:18px; transition:transform .3s; }
+        .back-btn:hover .arr { transform:translateX(-4px); }
+        .hidden { display:none; }
+    </style>
+</head>
+<body>
+<nav class="navbar">
+    <div class="logo">Tourism<span>Dinner</span></div>
+    <div class="nav-links">
+        <a href="/">{{ t.home }}</a> <a href="/admin">{{ t.admin }}</a>
+        <a href="/set_lang/ar" class="{{ 'lang-active' if lang == 'ar' }}">ع</a>
+        <a href="/set_lang/fr" class="{{ 'lang-active' if lang == 'fr' }}">FR</a>
+        <a href="/set_lang/en" class="{{ 'lang-active' if lang == 'en' }}">EN</a>
+    </div>
+</nav>
+<div class="explore-hero"><div class="explore-hero-text"><h1>{{ ville.nom }}</h1><p>{{ t.explore }}</p></div></div>
+<a href="/details/{{ ville.id }}" class="back-btn"><span class="arr">‹</span> {{ t.back }}</a>
+<div class="tabs">
+    <button class="tab-btn active" onclick="filterCat('all',this)">{{ t.all }}</button>
+    <button class="tab-btn" onclick="filterCat('restaurant',this)">🍽️ {{ t.restaurants }}</button>
+    <button class="tab-btn" onclick="filterCat('hotel',this)">🏨 {{ t.hotels }}</button>
+    <button class="tab-btn" onclick="filterCat('musee',this)">🏛️ {{ t.museums }}</button>
+    <button class="tab-btn" onclick="filterCat('pharmacie',this)">💊 {{ t.pharmacies }}</button>
+    <button class="tab-btn" onclick="filterCat('lieu',this)">🎯 {{ t.places }}</button>
+</div>
+<div class="attractions-grid">
+    {% for a in attractions %}
+    <a href="/attraction/{{ a.id }}" style="text-decoration:none;color:inherit;">
+    <div class="attraction-card" data-cat="{{ a.categorie }}">
+        <img src="{{ a.image }}" alt="{{ a.nom }}">
+        <div class="attraction-body">
+            <span class="cat-badge cat-{{ a.categorie }}">
+                {% if a.categorie == 'restaurant' %}🍽️ {{ t.restaurants }}
+                {% elif a.categorie == 'hotel' %}🏨 {{ t.hotels }}
+                {% elif a.categorie == 'musee' %}🏛️ {{ t.museums }}
+                {% elif a.categorie == 'pharmacie' %}💊 {{ t.pharmacies }}
+                {% elif a.categorie == 'lieu' %}🎯 {{ t.places }}{% endif %}
+            </span>
+            <h3>{{ a.nom }}</h3><p>{{ a.description }}</p>
+            <p style="font-size:12px;color:#aaa;">📍 {{ a.adresse }}</p>
+            <div class="attraction-meta"><span class="attraction-price">{{ a.prix }}</span><span class="attraction-note">⭐ {{ a.note }}</span></div>
+        </div>
+    </div>
+    </a>
+    {% endfor %}
+</div>
+<button class="scroll-top" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+<script>
+function filterCat(cat, el) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.attraction-card').forEach(c => { c.style.display = (cat === 'all' || c.dataset.cat === cat) ? 'block' : 'none'; });
+}
+window.addEventListener('scroll', function() {
+    const btn = document.getElementById('scrollTopBtn');
+    if (btn) btn.classList.toggle('show', window.scrollY > 300);
+});
+</script>
+</body>
+</html>

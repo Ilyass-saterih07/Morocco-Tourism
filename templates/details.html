@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ ville.nom }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        .detail-page { max-width:1200px; margin:0 auto; padding:20px 30px 50px; }
+        .detail-hero { position:relative; border-radius:24px; overflow:hidden; height:420px; margin-bottom:30px; }
+        .detail-hero img { width:100%; height:100%; object-fit:cover; }
+        .detail-hero-overlay { position:absolute; bottom:0; left:0; right:0; padding:30px; background:linear-gradient(transparent,rgba(0,0,0,0.8)); color:white; }
+        .detail-hero-overlay h1 { font-size:42px; font-weight:800; letter-spacing:-1px; margin-bottom:4px; }
+        .detail-hero-overlay .rating { color:#f59e0b; font-size:16px; font-weight:700; }
+        .detail-hero-overlay .type-badge { display:inline-block; padding:5px 16px; border-radius:20px; font-size:13px; font-weight:700; background:rgba(255,255,255,0.2); backdrop-filter:blur(6px); margin-bottom:10px; }
+        .action-bar { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:30px; }
+        .action-bar a,.action-bar button { padding:12px 24px; border-radius:14px; font-size:14px; font-weight:700; border:none; cursor:pointer; text-decoration:none; transition:all .2s; display:inline-flex; align-items:center; gap:8px; }
+        .btn-primary { background:#22c55e; color:white; box-shadow:0 4px 16px rgba(34,197,94,0.3); }
+        .btn-primary:hover { background:#16a34a; transform:translateY(-2px); }
+        .btn-dark { background:#111; color:white; }
+        .btn-dark:hover { background:#333; transform:translateY(-2px); }
+        .btn-fav { background:white; color:#e94560; border:2px solid #fee2e2; font-size:20px; }
+        .btn-fav.active { background:#fef2f2; border-color:#e94560; }
+        .btn-fav:hover { transform:scale(1.1); }
+        .btn-outline { background:white; color:#333; border:2px solid #e5e7eb; }
+        .btn-outline:hover { background:#f9f9f9; }
+        .section-card { background:white; border-radius:20px; padding:28px; box-shadow:0 2px 12px rgba(0,0,0,.06); margin-bottom:24px; }
+        .section-card h2 { font-size:22px; font-weight:800; color:#111; margin-bottom:16px; display:flex; align-items:center; gap:10px; }
+        .section-card p { color:#555; line-height:1.7; font-size:15px; }
+        .info-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; margin-top:16px; }
+        .info-item { background:#f9f9f9; border-radius:14px; padding:16px; }
+        .info-item .label { font-size:12px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+        .info-item .value { font-size:16px; font-weight:700; color:#111; }
+        .itinerary { display:flex; flex-direction:column; gap:20px; }
+        .day-card { background:#fafafa; border-radius:18px; padding:24px; border-left:5px solid #22c55e; }
+        .day-card h3 { font-size:18px; font-weight:800; color:#111; margin-bottom:14px; }
+        .day-card h3 span { color:#22c55e; }
+        .timeline { position:relative; padding-left:28px; }
+        .timeline::before { content:''; position:absolute; left:8px; top:4px; bottom:4px; width:2px; background:#e5e7eb; }
+        .timeline-item { position:relative; margin-bottom:16px; padding-left:16px; }
+        .timeline-item::before { content:''; position:absolute; left:-24px; top:6px; width:14px; height:14px; border-radius:50%; background:#22c55e; border:3px solid #dcfce7; }
+        .timeline-item .time { font-size:12px; font-weight:700; color:#22c55e; letter-spacing:.3px; }
+        .timeline-item .activity { font-size:14px; color:#333; font-weight:600; margin-top:2px; }
+        .timeline-item .desc { font-size:13px; color:#888; margin-top:2px; }
+        #map { height:400px; border-radius:16px; z-index:1; }
+        .map-toggle { display:flex; gap:8px; margin-bottom:10px; }
+        .map-toggle button { padding:8px 18px; border-radius:10px; border:2px solid #e5e7eb; background:white; font-size:13px; font-weight:700; cursor:pointer; transition:all .2s; }
+        .map-toggle button.active { background:#22c55e; border-color:#22c55e; color:white; }
+        .attractions-mini { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
+        .attraction-mini-card { width:200px; background:#f9f9f9; border-radius:14px; overflow:hidden; transition:transform .2s; }
+        .attraction-mini-card:hover { transform:translateY(-4px); }
+        .attraction-mini-card img { width:100%; height:110px; object-fit:cover; }
+        .attraction-mini-card .body { padding:10px 14px; }
+        .attraction-mini-card .body h4 { font-size:14px; font-weight:700; color:#111; }
+        .attraction-mini-card .body p { font-size:11px; color:#888; }
+        .attraction-mini-card .body .mini-price { font-size:12px; font-weight:700; color:#22c55e; }
+        .guides-mini { display:flex; gap:16px; flex-wrap:wrap; }
+        .guide-mini-card { width:200px; background:#f9f9f9; border-radius:16px; padding:18px; text-align:center; }
+        .guide-mini-card img { width:60px; height:60px; border-radius:50%; object-fit:cover; margin-bottom:8px; }
+        .guide-mini-card h4 { font-size:14px; font-weight:700; color:#111; }
+        .guide-mini-card p { font-size:12px; color:#888; }
+        .guide-mini-card .g-price { font-size:13px; font-weight:700; color:#22c55e; }
+        .desc-text { font-size:16px; line-height:1.8; color:#555; margin-bottom:20px; }
+        .review-card { display:flex; gap:16px; padding:16px; background:#f9f9f9; border-radius:14px; margin-bottom:12px; }
+        .review-card .avatar { width:44px; height:44px; border-radius:50%; background:#22c55e; color:white; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; flex-shrink:0; }
+        .review-card .review-body { flex:1; }
+        .review-card .review-body .author { font-weight:700; color:#111; font-size:14px; }
+        .review-card .review-body .r-date { font-size:11px; color:#aaa; }
+        .review-card .review-body .r-text { font-size:14px; color:#555; margin-top:4px; }
+        .review-card .stars { color:#f59e0b; font-size:14px; }
+        .accom-mini { display:flex; gap:12px; flex-wrap:wrap; }
+        .accom-mini-card { background:#f9f9f9; border-radius:14px; padding:14px 20px; text-align:center; min-width:120px; }
+        .accom-mini-card .accom-type { font-size:13px; font-weight:700; color:#888; }
+        .accom-mini-card .accom-price { font-size:18px; font-weight:800; color:#111; }
+        .plats-tags { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+        .plat-tag { background:#fef9c3; border-radius:20px; padding:6px 16px; font-size:13px; font-weight:600; color:#854d0e; }
+        .transport-grid { display:flex; gap:14px; flex-wrap:wrap; }
+        .transport-item { background:#f0fdf4; border-radius:14px; padding:16px 20px; text-align:center; flex:1; min-width:120px; }
+        .transport-item .t-icon { font-size:24px; margin-bottom:6px; }
+        .transport-item .t-label { font-size:12px; font-weight:700; color:#888; }
+        .transport-item .t-value { font-size:16px; font-weight:800; color:#111; }
+        .stat-badge { display:inline-flex; align-items:center; gap:4px; font-size:13px; font-weight:700; color:#555; background:#f4f4f4; padding:4px 12px; border-radius:20px; }
+        .itinerary-loading { text-align:center; padding:40px; color:#888; font-size:16px; }
+        .itinerary-loading .spinner { display:inline-block; width:32px; height:32px; border:3px solid #e5e7eb; border-top-color:#22c55e; border-radius:50%; animation:spin .8s linear infinite; margin-bottom:12px; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .itinerary-error { text-align:center; padding:30px; color:#dc2626; font-size:15px; font-weight:600; }
+    </style>
+</head>
+<body>
+<nav class="navbar">
+    <div class="logo">Tourism<span>Dinner</span></div>
+    <div class="nav-links">
+        <a href="/">{{ t.home }}</a>
+        <a href="/admin">{{ t.admin }}</a>
+        <a href="/set_lang/ar" class="{{ 'lang-active' if lang == 'ar' }}">ع</a>
+        <a href="/set_lang/fr" class="{{ 'lang-active' if lang == 'fr' }}">FR</a>
+        <a href="/set_lang/en" class="{{ 'lang-active' if lang == 'en' }}">EN</a>
+    </div>
+</nav>
+
+<div class="detail-page">
+    <div class="detail-hero">
+        <img src="{{ ville.image }}" alt="{{ ville.nom }}">
+        <div class="detail-hero-overlay">
+            <span class="type-badge">
+                {% if ville.type == 'Desert' or ville.type == 'Désert' %}{{ t.type_desert }}
+                {% elif ville.type == 'Plage' %}{{ t.type_plage }}
+                {% elif ville.type == 'Montagne' %}{{ t.type_montagne }}
+                {% elif ville.type == 'Histoire' %}{{ t.type_histoire }}
+                {% else %}{{ t.type_ville }}{% endif %}
+            </span>
+            <h1>{{ ville.nom }}</h1>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:4px;">
+                {% if ville.rating %}<div class="rating">⭐ {{ ville.rating }}</div>{% endif %}
+                {% if ville.review_count %}<span style="font-size:13px;color:#ccc;">{{ ville.review_count }} {{ t.avis_count }}</span>{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="action-bar">
+        <a href="/explore/{{ ville.id }}" class="btn-primary">🗺️ {{ t.explore }}</a>
+        <a href="/reservation/{{ ville.id }}" class="btn-dark">📋 {{ t.reserve }}</a>
+        <a href="/favori/toggle/{{ ville.id }}" class="btn-fav {% if is_fav %}active{% endif %}" id="favBtn" data-id="{{ ville.id }}">{% if is_fav %}❤️{% else %}🤍{% endif %}</a>
+        <button class="btn-outline" onclick="shareCity()">📤 {{ t.share }}</button>
+        <a href="/" class="btn-dark" style="background:#555;">← {{ t.back }}</a>
+    </div>
+
+    <div class="section-card">
+        <p class="desc-text">{{ ville.description }}</p>
+        <div class="info-grid">
+            <div class="info-item"><div class="label">{{ t.type }}</div><div class="value">{% if ville.type == 'Desert' or ville.type == 'Désert' %}{{ t.type_desert }}{% elif ville.type == 'Plage' %}{{ t.type_plage }}{% elif ville.type == 'Montagne' %}{{ t.type_montagne }}{% elif ville.type == 'Histoire' %}{{ t.type_histoire }}{% else %}{{ t.type_ville }}{% endif %}</div></div>
+            <div class="info-item"><div class="label">{{ t.distance }}</div><div class="value">{{ ville.distance }}</div></div>
+            <div class="info-item"><div class="label">{{ t.bus }}</div><div class="value">{{ ville.prix_bus }}</div></div>
+            <div class="info-item"><div class="label">{{ t.taxi }}</div><div class="value">{{ ville.prix_taxi }}</div></div>
+            {% if ville.note %}<div class="info-item"><div class="label">{{ t.rating_label }}</div><div class="value">⭐ {{ ville.note }}</div></div>{% endif %}
+            {% if ville.review_count %}<div class="info-item"><div class="label">{{ t.reviews }}</div><div class="value">{{ ville.review_count }}</div></div>{% endif %}
+            {% if ville.population %}<div class="info-item"><div class="label">{{ t.population }}</div><div class="value">{{ ville.population }}</div></div>{% endif %}
+            {% if ville.monnaie %}<div class="info-item"><div class="label">{{ t.currency }}</div><div class="value">{{ ville.monnaie }}</div></div>{% endif %}
+            {% if ville.langues %}<div class="info-item"><div class="label">{{ t.languages }}</div><div class="value">{{ ville.langues }}</div></div>{% endif %}
+            {% if ville.meilleure_periode %}<div class="info-item"><div class="label">{{ t.best_period }}</div><div class="value">{{ ville.meilleure_periode }}</div></div>{% endif %}
+        </div>
+    </div>
+
+    {% if ville.bus_duration or ville.taxi_duration or ville.voiture_duration %}
+    <div class="section-card">
+        <h2>🚌 {{ t.transport }}</h2>
+        <div class="transport-grid">
+            {% if ville.bus_duration %}<div class="transport-item"><div class="t-icon">🚌</div><div class="t-label">{{ t.bus_duration }}</div><div class="t-value">{{ ville.bus_duration }}</div></div>{% endif %}
+            {% if ville.taxi_duration %}<div class="transport-item"><div class="t-icon">🚕</div><div class="t-label">{{ t.taxi_duration }}</div><div class="t-value">{{ ville.taxi_duration }}</div></div>{% endif %}
+            {% if ville.voiture_duration %}<div class="transport-item"><div class="t-icon">🚗</div><div class="t-label">{{ t.voiture_duration }}</div><div class="t-value">{{ ville.voiture_duration }}</div></div>{% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if ville.plats_typiques %}
+    <div class="section-card">
+        <h2>🍽️ {{ t.plats_typiques }}</h2>
+        <div class="plats-tags">
+            {% for plat in ville.plats_typiques.split(',') %}
+            <span class="plat-tag">{{ plat.strip() }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+
+
+    {% if ville.atmosphere or ville.risques or ville.activites or ville.infos_utiles %}
+    <div class="section-card">
+        <div class="info-grid">
+            {% if ville.atmosphere %}<div class="info-item"><div class="label">{{ t.atmosphere }}</div><div class="value">{{ ville.atmosphere }}</div></div>{% endif %}
+            {% if ville.risques %}<div class="info-item"><div class="label">{{ t.risks }}</div><div class="value" style="color:#dc2626;">{{ ville.risques }}</div></div>{% endif %}
+            {% if ville.activites %}<div class="info-item"><div class="label">{{ t.activities }}</div><div class="value">{{ ville.activites }}</div></div>{% endif %}
+            {% if ville.infos_utiles %}<div class="info-item"><div class="label">{{ t.useful_info }}</div><div class="value">{{ ville.infos_utiles }}</div></div>{% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if prix_hebergement %}
+    <div class="section-card">
+        <h2>🏨 {{ t.accommodation_cost_label }}</h2>
+        <div class="accom-mini">
+            {% for ph in prix_hebergement %}
+            <div class="accom-mini-card">
+                <div class="accom-type">
+                    {% if ph.type_hebergement == 'hotel' %}{{ t.hotel }}
+                    {% elif ph.type_hebergement == 'riad' %}{{ t.riad }}
+                    {% elif ph.type_hebergement == 'auberge' %}{{ t.auberge }}
+                    {% elif ph.type_hebergement == 'camp' %}{{ t.camp }}
+                    {% else %}{{ ph.type_hebergement }}{% endif %}
+                </div>
+                <div class="accom-price">{{ ph.prix_par_nuit }} {{ t.mad }}</div>
+                <div style="font-size:11px;color:#aaa;">/ {{ t.days_nights }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if attractions %}
+    <div class="section-card">
+        <h2>📍 {{ t.explore_attractions }}</h2>
+        <div class="attractions-mini">
+            {% for a in attractions %}
+            <a href="/attraction/{{ a.id }}" style="text-decoration:none;color:inherit;">
+            <div class="attraction-mini-card">
+                {% if a.image %}<img src="{{ a.image }}" alt="{{ a.nom }}">{% endif %}
+                <div class="body">
+                    <h4>{{ a.nom }}</h4>
+                    <p>{{ a.categorie }}</p>
+                    <div class="mini-price">{{ a.prix }}</div>
+                </div>
+            </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if avis_list %}
+    <div class="section-card">
+        <h2>💬 {{ t.reviews }} ({{ avis_list|length }})</h2>
+        {% for avis in avis_list %}
+        <div class="review-card">
+            <div class="avatar">{{ avis.auteur[:1]|upper }}</div>
+            <div class="review-body">
+                <div class="author">{{ avis.auteur }}</div>
+                <div class="stars">{% for i in range(avis.note|int) %}⭐{% endfor %}</div>
+                <div class="r-date">{{ avis.date_post }}</div>
+                {% if avis.commentaire %}<div class="r-text">{{ avis.commentaire }}</div>{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="section-card">
+        <h2>🗺️ {{ t.localisation }}</h2>
+        <div class="map-toggle">
+            <button class="active" id="mapStreetBtn">🗺️ Street</button>
+            <button id="mapSatBtn">🛰️ Satellite</button>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <div class="section-card" id="itineraryPlanner">
+        <h2>📅 {{ t.plan_title }}</h2>
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
+            <label style="font-weight:700;color:#333;">{{ t.num_days }}:</label>
+            <input type="number" id="daysInput" value="3" min="1" max="30" style="width:80px;padding:10px 14px;border:2px solid #e5e7eb;border-radius:12px;font-size:16px;font-weight:700;text-align:center;">
+            <span style="font-weight:600;color:#888;">{{ t.days_label }}</span>
+            <button onclick="generateItinerary({{ ville.id }})" style="padding:10px 24px;border-radius:14px;font-size:14px;font-weight:700;border:none;cursor:pointer;background:#22c55e;color:white;box-shadow:0 4px 16px rgba(34,197,94,0.3);transition:all .2s;">🚀 {{ t.generate_btn }}</button>
+        </div>
+        <div id="itineraryResult" class="itinerary"></div>
+    </div>
+
+    <div id="pageData" data-nom="{{ ville.nom }}" data-desc="{{ ville.description[:100] if ville.description else '' }}" data-share="{{ t.share }}" data-lat="{{ ville.lat|default('') }}" data-lng="{{ ville.lng|default('') }}"></div>
+    {% if guides %}
+    <div class="section-card">
+        <h2>👨‍🦱 {{ t.our_guides }}</h2>
+        <div class="guides-mini">
+            {% for g in guides %}
+            <div class="guide-mini-card">
+                {% if g.image %}<img src="{{ g.image }}" alt="{{ g.nom }}">{% endif %}
+                <h4>{{ g.nom }}</h4>
+                <p>{{ g.specialite }}</p>
+                <div class="g-price">{{ g.prix }} {{ t.mad }}</div>
+                {% if g.telephone %}<p>📞 {{ g.telephone }}</p>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<button class="scroll-top" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var pg = document.getElementById('pageData').dataset;
+var cityName = pg.nom;
+var popupDesc = pg.desc;
+var shareTitle = pg.nom;
+var shareMsg = pg.share;
+var lat = pg.lat ? parseFloat(pg.lat) : null;
+var lng = pg.lng ? parseFloat(pg.lng) : null;
+
+if (typeof L !== 'undefined') {
+    var map = L.map('map').setView([31.6295, -7.9811], 6);
+    var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+    var satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '© Esri' });
+    streetLayer.addTo(map);
+    var currentTile = 'street';
+    document.getElementById('mapStreetBtn').addEventListener('click', function() {
+        if (currentTile === 'satellite') {
+            map.removeLayer(satLayer);
+            streetLayer.addTo(map);
+            currentTile = 'street';
+        }
+        document.querySelectorAll('.map-toggle button').forEach(function(b) { b.classList.remove('active'); });
+        this.classList.add('active');
+    });
+    document.getElementById('mapSatBtn').addEventListener('click', function() {
+        if (currentTile === 'street') {
+            map.removeLayer(streetLayer);
+            satLayer.addTo(map);
+            currentTile = 'satellite';
+        }
+        document.querySelectorAll('.map-toggle button').forEach(function(b) { b.classList.remove('active'); });
+        this.classList.add('active');
+    });
+    if (lat && lng) {
+        map.setView([lat, lng], 12);
+        L.marker([lat, lng]).addTo(map).bindPopup('<b>' + cityName + '</b><br>' + popupDesc).openPopup();
+    }
+}
+document.getElementById('favBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    var id = this.getAttribute('data-id');
+    fetch('/favori/toggle/' + id).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.is_fav) { e.target.closest('.btn-fav').classList.add('active'); e.target.closest('.btn-fav').innerHTML = '❤️'; }
+        else { e.target.closest('.btn-fav').classList.remove('active'); e.target.closest('.btn-fav').innerHTML = '🤍'; }
+    });
+});
+function generateItinerary(villeId) {
+    var days = document.getElementById('daysInput').value;
+    var result = document.getElementById('itineraryResult');
+    result.innerHTML = '<div class="itinerary-loading"><div class="spinner"></div><div>Generating itinerary...</div></div>';
+    fetch('/api/generate_itinerary/' + villeId + '?days=' + days)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error || !data.itinerary || data.itinerary.length === 0) {
+                result.innerHTML = '<div class="itinerary-error">{{ t.no_attractions_for_itinerary }}</div>';
+                return;
+            }
+            var html = '';
+            data.itinerary.forEach(function(d) {
+                html += '<div class="day-card">';
+                html += '<h3><span>' + ('0' + d.day).slice(-2) + '</span> — ' + (d.title || '{{ t.day }} ' + d.day) + '</h3>';
+                html += '<div class="timeline">';
+                d.activities.forEach(function(act) {
+                    var timeStr = act.time || '';
+                    var label = act.label || '';
+                    var desc = act.desc || '';
+                    var prix = act.prix || '';
+                    var icon = act.icon || '';
+                    html += '<div class="timeline-item">';
+                    html += '<div class="time">' + timeStr + '</div>';
+                    html += '<div class="activity">' + icon + ' ' + label + '</div>';
+                    if (desc) html += '<div class="desc">' + desc + '</div>';
+                    if (prix) html += '<div class="desc" style="color:#22c55e;font-weight:700;">' + prix + '</div>';
+                    html += '</div>';
+                });
+                html += '</div></div>';
+            });
+            result.innerHTML = html;
+        })
+        .catch(function() {
+            result.innerHTML = '<div class="itinerary-error">{{ t.no_attractions_for_itinerary }}</div>';
+        });
+}
+function shareCity() {
+    var url = window.location.href;
+    if (navigator.share) { navigator.share({ title: shareTitle, url: url }); }
+    else { navigator.clipboard.writeText(url).then(function() { alert(shareMsg + ': ' + url); }); }
+}
+window.addEventListener('scroll', function() {
+    document.getElementById('scrollTopBtn').classList.toggle('show', window.scrollY > 300);
+});
+generateItinerary({{ ville.id }});
+</script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ a.nom }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .attraction-detail-page { padding: 30px; max-width: 1000px; margin: 0 auto; }
+        .attraction-detail-card { background: white; border-radius: 24px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
+        .attraction-detail-card img { width: 100%; max-height: 460px; object-fit: cover; display: block; }
+        .attraction-detail-body { padding: 32px; }
+        .attraction-detail-body h1 { font-size: 36px; font-weight: 800; color: #111; margin-bottom: 8px; letter-spacing: -1px; }
+        .attraction-detail-body .desc { color: #555; font-size: 16px; line-height: 1.7; margin-bottom: 16px; }
+        .attraction-detail-body .info-row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; }
+        .attraction-detail-body .info-item { background: #f9f9f9; padding: 12px 18px; border-radius: 14px; font-size: 14px; color: #333; }
+        .attraction-detail-body .info-item strong { color: #111; }
+        .cat-badge-detail { display: inline-block; padding: 6px 18px; border-radius: 20px; font-size: 14px; font-weight: 700; margin-bottom: 14px; }
+        .cat-restaurant-d { background: #fef9c3; color: #854d0e; } .cat-hotel-d { background: #dbeafe; color: #1e40af; }
+        .cat-musee-d { background: #fce7f3; color: #9d174d; } .cat-pharmacie-d { background: #dcfce7; color: #166534; }
+        .cat-lieu-d { background: #ffedd5; color: #9a3412; }
+        .btn-reserve-attraction { display: inline-block; margin-top: 20px; padding: 16px 40px; background: #22c55e; color: white; border: none; border-radius: 14px; font-size: 18px; font-weight: 700; cursor: pointer; text-decoration: none; transition: background .2s, transform .15s, box-shadow .2s; box-shadow: 0 4px 16px rgba(34,197,94,0.35); }
+        .btn-reserve-attraction:hover { background: #16a34a; transform: translateY(-3px); box-shadow: 0 8px 28px rgba(34,197,94,0.45); }
+        .back-link-det { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 16px; padding: 10px 20px; background: #111; color: white; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 14px; transition: background .2s; }
+        .back-link-det:hover { background: #22c55e; }
+        .map-container-detail { margin-top: 24px; border-radius: 20px; overflow: hidden; box-shadow: 0 2px 16px rgba(0,0,0,0.08); }
+        .map-container-detail iframe { width: 100%; height: 350px; border: none; display: block; }
+        .section-title { font-size: 22px; font-weight: 800; color: #111; margin: 28px 0 16px; letter-spacing: -0.5px; }
+        .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+        .menu-item-card { background: #fafafa; border-radius: 16px; padding: 18px; border: 1.5px solid #f0f0f0; transition: transform .2s, box-shadow .2s; }
+        .menu-item-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+        .menu-item-card h4 { font-size: 16px; font-weight: 700; color: #111; margin-bottom: 4px; }
+        .menu-item-card .menu-price { font-size: 15px; font-weight: 800; color: #22c55e; margin-bottom: 4px; }
+        .menu-item-card .menu-desc { font-size: 13px; color: #888; line-height: 1.5; }
+        .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+        .room-card { background: #fafafa; border-radius: 16px; padding: 20px; border: 1.5px solid #f0f0f0; transition: transform .2s, box-shadow .2s; }
+        .room-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+        .room-card h4 { font-size: 17px; font-weight: 700; color: #111; margin-bottom: 6px; }
+        .room-card .room-price { font-size: 16px; font-weight: 800; color: #22c55e; margin-bottom: 4px; }
+        .room-card .room-desc { font-size: 13px; color: #888; line-height: 1.5; margin-bottom: 8px; }
+        .room-card .room-cap { display: inline-block; font-size: 12px; font-weight: 600; color: #555; background: #e5e7eb; padding: 4px 12px; border-radius: 20px; }
+        .address-text { font-size: 14px; color: #666; margin-bottom: 16px; }
+        .address-text span { color: #111; font-weight: 600; }
+    </style>
+</head>
+<body>
+<nav class="navbar">
+    <div class="logo">Tourism<span>Dinner</span></div>
+    <div class="nav-links">
+        <a href="/">{{ t.home }}</a>
+        <a href="/admin">{{ t.admin }}</a>
+        <a href="/set_lang/ar" class="{{ 'lang-active' if lang == 'ar' }}">ع</a>
+        <a href="/set_lang/fr" class="{{ 'lang-active' if lang == 'fr' }}">FR</a>
+        <a href="/set_lang/en" class="{{ 'lang-active' if lang == 'en' }}">EN</a>
+    </div>
+</nav>
+
+<div class="attraction-detail-page">
+    <a href="/explore/{{ a.ville_id }}" class="back-link-det">‹ {{ t.back }}</a>
+    <div class="attraction-detail-card">
+        <img src="{{ a.image }}" alt="{{ a.nom }}">
+        <div class="attraction-detail-body">
+            <span class="cat-badge-detail cat-{{ a.categorie }}-d">
+                {% if a.categorie == 'restaurant' %}🍽️ {{ t.restaurants }}
+                {% elif a.categorie == 'hotel' %}🏨 {{ t.hotels }}
+                {% elif a.categorie == 'musee' %}🏛️ {{ t.museums }}
+                {% elif a.categorie == 'pharmacie' %}💊 {{ t.pharmacies }}
+                {% elif a.categorie == 'lieu' %}🎯 {{ t.places }}{% endif %}
+            </span>
+            <h1>{{ a.nom }}</h1>
+            <p class="desc">{{ a.description }}</p>
+            <p class="address-text"><span>{{ t.address }}:</span> {{ a.adresse }}</p>
+            <div class="info-row">
+                <div class="info-item"><strong>{{ t.price }}:</strong> <span style="color:#22c55e;font-weight:700;">{{ a.prix }}</span></div>
+                <div class="info-item"><strong>{{ t.rating }}:</strong> <span style="color:#f59e0b;font-weight:700;">⭐ {{ a.note }}</span></div>
+                <div class="info-item"><strong>{{ t.city }}:</strong> {{ a.ville_nom }}</div>
+            </div>
+
+            {% if a.categorie == 'restaurant' and menu_items %}
+            <h3 class="section-title">🍽️ {{ t.menu_title }}</h3>
+            <div class="menu-grid">
+                {% for item in menu_items %}
+                <div class="menu-item-card">
+                    <h4>{{ item.nom_item }}</h4>
+                    <div class="menu-price">{{ item.prix }}</div>
+                    {% if item.description %}<p class="menu-desc">{{ item.description }}</p>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if a.categorie == 'hotel' and hotel_rooms %}
+            <h3 class="section-title">🏨 {{ t.rooms_title }}</h3>
+            <div class="room-grid">
+                {% for room in hotel_rooms %}
+                <div class="room-card">
+                    <h4>{{ room.type_chambre }}</h4>
+                    <div class="room-price">{{ room.prix }}</div>
+                    {% if room.description %}<p class="room-desc">{{ room.description }}</p>{% endif %}
+                    <span class="room-cap">👥 {{ room.capacite }} {{ t.persons_capacity }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <h3 class="section-title">📍 {{ t.location }}</h3>
+            <div class="map-container-detail">
+                <iframe src="https://www.google.com/maps?q={{ (a.nom + ' ' + a.ville_nom + ' Morocco')|urlencode }}&output=embed" allowfullscreen loading="lazy"></iframe>
+            </div>
+
+            <a href="/reserver_attraction/{{ a.id }}" class="btn-reserve-attraction">{{ t.reserve }}</a>
+        </div>
+    </div>
+</div>
+
+<button class="scroll-top" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+<script>
+window.addEventListener('scroll', function() {
+    document.getElementById('scrollTopBtn').classList.toggle('show', window.scrollY > 300);
+});
+</script>
+</body>
+</html>

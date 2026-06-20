@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ t.reserve_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        .toast { position:fixed; top:30px; left:50%; transform:translateX(-50%) translateY(-120px); background:#22c55e; color:white; padding:18px 36px; border-radius:16px; font-weight:700; font-size:17px; box-shadow:0 8px 40px rgba(34,197,94,0.35); z-index:9999; transition:transform .5s cubic-bezier(.34,1.56,.64,1); display:flex; align-items:center; gap:12px; pointer-events:none; }
+        .toast.show { transform:translateX(-50%) translateY(0); }
+        .download-btn { display:none; margin-top:16px; padding:14px 32px; background:#111; color:white; border:none; border-radius:14px; font-size:16px; font-weight:700; cursor:pointer; transition:background .2s,transform .15s; box-shadow:0 2px 8px rgba(0,0,0,0.2); }
+        .download-btn:hover { background:#22c55e; transform:translateY(-2px); }
+        .arrow-indicator { display:none; text-align:center; margin-top:10px; animation:bounceArrow 1s infinite; }
+        .arrow-indicator span { display:inline-block; font-size:32px; color:#22c55e; filter:drop-shadow(0 2px 6px rgba(34,197,94,0.4)); }
+        @keyframes bounceArrow { 0%,100% { transform:translateY(0); } 50% { transform:translateY(10px); } }
+        #pdf-receipt { position:absolute; left:-9999px; top:0; width:600px; padding:40px; background:white; font-family:'Segoe UI',Arial,sans-serif; direction:ltr; }
+        #pdf-receipt h1 { font-size:28px; font-weight:800; color:#111; margin-bottom:4px; }
+        #pdf-receipt h1 span { color:#22c55e; }
+        #pdf-receipt .sub { color:#888; font-size:14px; margin-bottom:24px; }
+        #pdf-receipt .line { height:3px; background:#22c55e; width:60px; margin-bottom:20px; border-radius:4px; }
+        #pdf-receipt table { width:100%; border-collapse:collapse; }
+        #pdf-receipt td { padding:10px 0; border-bottom:1px solid #f0f0f0; font-size:15px; color:#333; }
+        #pdf-receipt td:first-child { font-weight:600; color:#111; width:140px; }
+        #pdf-receipt .footer { margin-top:30px; text-align:center; color:#aaa; font-size:13px; }
+        #pdf-receipt .stamp { margin-top:20px; text-align:center; font-size:40px; }
+        .form-label { font-size: 13px; font-weight: 700; color: #333; margin-bottom: 4px; display: block; }
+        .card-row { display: flex; gap: 10px; align-items: center; background: #f9f9f9; padding: 12px 16px; border-radius: 12px; border: 1.5px solid #e5e7eb; }
+        .card-row input { border: none; background: transparent; padding: 8px 4px; flex: 1; outline: none; font-size: 15px; }
+        .card-icons { font-size: 22px; letter-spacing: 4px; color: #555; }
+        .price-estimate-box { background:#f0fdf4; border-radius:14px; padding:16px; margin-bottom:16px; display:none; }
+        .price-estimate-box .pe-row { display:flex; justify-content:space-between; padding:6px 0; font-size:14px; }
+        .price-estimate-box .pe-row.total { border-top:2px solid #22c55e; margin-top:6px; padding-top:10px; font-size:16px; font-weight:800; color:#111; }
+        .price-estimate-box .pe-label { color:#555; }
+        .price-estimate-box .pe-value { color:#111; font-weight:700; }
+        .estimate-toggle { font-size:12px; color:#22c55e; cursor:pointer; font-weight:700; text-align:center; margin-top:8px; }
+        .estimate-toggle:hover { text-decoration:underline; }
+        .reservation-container { max-width:560px; }
+    </style>
+</head>
+<body>
+<div class="toast" id="toast">{{ t.booking_success }}</div>
+<button class="scroll-top" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+
+<nav class="navbar">
+    <div class="logo">Tourism<span>Dinner</span></div>
+    <div class="nav-links">
+        <a href="/">{{ t.home }}</a> <a href="/admin">{{ t.admin }}</a>
+        <a href="/set_lang/ar" class="{{ 'lang-active' if lang == 'ar' }}">ع</a>
+        <a href="/set_lang/fr" class="{{ 'lang-active' if lang == 'fr' }}">FR</a>
+        <a href="/set_lang/en" class="{{ 'lang-active' if lang == 'en' }}">EN</a>
+    </div>
+</nav>
+
+<div class="reservation-container">
+    <form method="POST" class="reservation-form" id="bookingForm">
+        <h1>{{ t.reserve_title }} : {{ ville.nom }}</h1>
+
+        <label class="form-label">{{ t.your_name }}</label>
+        <input type="text" name="nom" id="nomInput" placeholder="{{ t.placeholder_name }}" required>
+
+        <label class="form-label">{{ t.email }}</label>
+        <input type="email" name="email" id="emailInput" placeholder="{{ t.placeholder_email }}" required>
+
+        <label class="form-label">{{ t.telephone }}</label>
+        <input type="tel" name="telephone" id="telInput" placeholder="{{ t.placeholder_phone }}" required>
+
+        <label class="form-label">{{ t.departure_date }}</label>
+        <input type="date" name="date_depart" id="dateInput" required>
+
+        <label class="form-label">{{ t.return_date }}</label>
+        <input type="date" name="date_retour" id="dateRetourInput">
+
+        <label class="form-label">{{ t.accommodation_type }}</label>
+        <select name="accommodation_type" id="accomType">
+            <option value="hotel">{{ t.hotel }}</option>
+            <option value="riad">{{ t.riad }}</option>
+            <option value="auberge">{{ t.auberge }}</option>
+            <option value="camp">{{ t.camp }}</option>
+        </select>
+
+        <label class="form-label">{{ t.departure_city }}</label>
+        <select name="depart_ville_id" id="departCity">
+            {% for cv in all_villes %}
+            <option value="{{ cv.id }}" {% if cv.id == 9 %}selected{% endif %}>{{ cv.nom if lang=='ar' else (cv.nom_fr if lang=='fr' else cv.nom_en) }}</option>
+            {% endfor %}
+        </select>
+
+        <label class="form-label">{{ t.guide }}</label>
+        <select name="guide_id" id="guideSelect">
+            <option value="">{{ t.no_guide }}</option>
+            {% for g in guides %}
+            <option value="{{ g.id }}">{{ g.nom }} - {{ g.prix }} {{ t.mad }}</option>
+            {% endfor %}
+        </select>
+
+        <label class="form-label">{{ t.persons }}</label>
+        <select name="personnes" id="personnesInput">
+            {% for i in range(1, 21) %} <option value="{{ i }}">{{ i }}</option> {% endfor %}
+        </select>
+
+        <div class="estimate-toggle" id="estToggle">{{ t.price_estimate }} 📊</div>
+        <div class="price-estimate-box" id="estBox">
+            <div class="pe-row"><span class="pe-label">{{ t.transport_cost_label }}</span><span class="pe-value" id="estTransport">0 {{ t.mad }}</span></div>
+            <div class="pe-row"><span class="pe-label">{{ t.accommodation_cost_label }}</span><span class="pe-value" id="estAccom">0 {{ t.mad }}</span></div>
+            <div class="pe-row"><span class="pe-label">{{ t.guide_cost_label }}</span><span class="pe-value" id="estGuide">0 {{ t.mad }}</span></div>
+            <div class="pe-row total"><span class="pe-label">{{ t.total_estimate }}</span><span class="pe-value" id="estTotal">0 {{ t.mad }}</span></div>
+        </div>
+
+        <label class="form-label">{{ t.card_info }}</label>
+        <div class="card-row">
+            <span class="card-icons">💳</span>
+            <input type="text" name="card_number" id="cardInput" placeholder="1234 5678 9012 3456" maxlength="19" required>
+        </div>
+
+        <button type="submit" id="submitBtn">{{ t.confirm }}</button>
+        <div class="arrow-indicator" id="arrowIndicator"><span>👇</span></div>
+        <button type="button" class="download-btn" id="downloadBtn">📄 {{ t.download_pdf }}</button>
+    </form>
+</div>
+
+<div id="pdf-receipt">
+    <h1>Tourism<span> Dinner</span></h1>
+    <div class="sub">{{ t.pdf_title }}</div>
+    <div class="line"></div>
+    <table>
+        <tr><td>{{ t.pdf_city }}</td><td id="pdf-ville">{{ ville.nom }}</td></tr>
+        <tr><td>{{ t.pdf_client }}</td><td id="pdf-nom">—</td></tr>
+        <tr><td>Email</td><td id="pdf-email">—</td></tr>
+        <tr><td>{{ t.pdf_date }}</td><td id="pdf-date">—</td></tr>
+        <tr><td>{{ t.pdf_persons }}</td><td id="pdf-persons">—</td></tr>
+        <tr><td>{{ t.pdf_status }}</td><td style="color:#22c55e;font-weight:700;">{{ t.pdf_confirmed }}</td></tr>
+    </table>
+    <div class="footer">{{ t.pdf_thank_you }}</div>
+    <div class="stamp">⛱️</div>
+</div>
+
+<div id="priceData" data-prix-bus="{{ ville.prix_bus }}" data-prix-taxi="{{ ville.prix_taxi }}" data-ville-id="{{ ville.id }}" data-depart-id="9" hidden></div>
+
+<script>
+var pd = document.getElementById('priceData');
+var villeId = pd.getAttribute('data-ville-id');
+
+document.getElementById('estToggle').addEventListener('click', function() {
+    var box = document.getElementById('estBox');
+    box.style.display = box.style.display === 'block' ? 'none' : 'block';
+});
+
+function updateEstimate() {
+    var personnes = parseInt(document.getElementById('personnesInput').value) || 1;
+    var accomType = document.getElementById('accomType').value;
+    var dateDep = document.getElementById('dateInput').value;
+    var dateRet = document.getElementById('dateRetourInput').value;
+    var nbJours = 1;
+    if (dateDep && dateRet) {
+        var d1 = new Date(dateDep), d2 = new Date(dateRet);
+        if (d2 > d1) nbJours = Math.ceil((d2 - d1) / (1000*60*60*24));
+    }
+    var departId = document.getElementById('departCity').value;
+    var guideId = document.getElementById('guideSelect').value;
+    fetch('/api/prix-estimation', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+            ville_id: villeId,
+            depart_ville_id: departId,
+            nb_personnes: personnes,
+            nb_jours: nbJours,
+            transport_type: 'bus',
+            accommodation_type: accomType,
+            guide_id: guideId || null
+        })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        document.getElementById('estTransport').textContent = d.transport + ' {{ t.mad }}';
+        document.getElementById('estAccom').textContent = d.accommodation + ' {{ t.mad }}';
+        document.getElementById('estGuide').textContent = d.guide + ' {{ t.mad }}';
+        document.getElementById('estTotal').textContent = d.total + ' {{ t.mad }}';
+    });
+}
+
+document.getElementById('personnesInput').addEventListener('change', updateEstimate);
+document.getElementById('accomType').addEventListener('change', updateEstimate);
+document.getElementById('dateInput').addEventListener('change', updateEstimate);
+document.getElementById('dateRetourInput').addEventListener('change', updateEstimate);
+document.getElementById('departCity').addEventListener('change', updateEstimate);
+document.getElementById('guideSelect').addEventListener('change', updateEstimate);
+
+let lastBooking = null;
+document.getElementById('bookingForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true; btn.textContent = '{{ t.booking_processing }}';
+    const formData = new FormData(this);
+    try {
+        const res = await fetch(this.action, { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            lastBooking = data;
+            document.getElementById('pdf-nom').textContent = data.nom;
+            document.getElementById('pdf-email').textContent = data.email;
+            document.getElementById('pdf-date').textContent = data.date_depart;
+            document.getElementById('pdf-persons').textContent = data.personnes;
+            document.getElementById('downloadBtn').style.display = 'inline-block';
+            document.getElementById('arrowIndicator').style.display = 'block';
+            document.getElementById('nomInput').value = '';
+            document.getElementById('emailInput').value = '';
+            document.getElementById('telInput').value = '';
+            document.getElementById('dateInput').value = '';
+            document.getElementById('dateRetourInput').value = '';
+            document.getElementById('cardInput').value = '';
+            document.getElementById('personnesInput').value = 1;
+            document.getElementById('accomType').value = 'hotel';
+            const toast = document.getElementById('toast');
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3500);
+        }
+    } catch (err) { alert('{{ t.booking_error }}'); }
+    btn.disabled = false; btn.textContent = '{{ t.confirm }}';
+});
+window.addEventListener('scroll', function() {
+    document.getElementById('scrollTopBtn').classList.toggle('show', window.scrollY > 300);
+});
+document.getElementById('downloadBtn').addEventListener('click', function() {
+    html2pdf().set({
+        margin: [10, 10],
+        filename: 'booking-' + lastBooking.ville + '-' + lastBooking.nom + '.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(document.getElementById('pdf-receipt')).save();
+});
+</script>
+</body>
+</html>

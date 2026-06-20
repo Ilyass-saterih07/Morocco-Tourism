@@ -1,0 +1,162 @@
+﻿<!DOCTYPE html>
+<html dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Tourism Dinner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .type-filters { display:flex; gap:10px; padding:20px 30px 0; flex-wrap:wrap; justify-content:center; }
+        .type-btn { padding:10px 22px; border-radius:30px; border:2px solid #e5e7eb; background:white; font-size:14px; font-weight:700; cursor:pointer; transition:all .2s; color:#555; text-decoration:none; }
+        .type-btn:hover,.type-btn.active { background:#22c55e; border-color:#22c55e; color:white; }
+        .guides-section { padding:30px; max-width:1200px; margin:0 auto; }
+        .guides-section h2 { font-size:26px; font-weight:800; margin-bottom:20px; color:#111; }
+        .guides-grid { display:flex; gap:20px; flex-wrap:wrap; justify-content:center; }
+        .guide-card { width:240px; background:white; border-radius:20px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.08); padding:20px; text-align:center; transition:transform .3s; }
+        .guide-card:hover { transform:translateY(-6px); box-shadow:0 12px 32px rgba(0,0,0,.12); }
+        .guide-card img { width:80px; height:80px; border-radius:50%; object-fit:cover; margin-bottom:12px; }
+        .guide-card h4 { font-size:16px; font-weight:700; color:#111; margin-bottom:4px; }
+        .guide-card p { font-size:13px; color:#888; margin:4px 0; }
+        .guide-card .guide-price { font-weight:700; color:#22c55e; font-size:15px; }
+        .card-header { display:flex; align-items:center; }
+        .fav-btn { background:none; border:none; font-size:22px; cursor:pointer; transition:transform .2s; padding:4px; }
+        .fav-btn:hover { transform:scale(1.2); }
+        .fav-active { color:#e94560; }
+        .search-advanced { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; width:100%; }
+        .search-advanced input { flex:1; min-width:200px; padding:16px 22px; font-size:16px; border:none; outline:none; color:#111; }
+        .search-advanced select { padding:14px 18px; border:none; font-size:14px; font-weight:600; color:#333; background:#f4f4f4; outline:none; cursor:pointer; border-radius:0; min-width:140px; }
+        .search-advanced button { background:#22c55e; color:white; border:none; padding:16px 28px; font-size:16px; font-weight:700; cursor:pointer; transition:background .2s; }
+        .search-advanced button:hover { background:#16a34a; }
+        .hero-form { width:100%; max-width:800px; margin:0 auto; }
+        .rating-badge { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:700; color:#f59e0b; background:#fffbeb; padding:3px 10px; border-radius:20px; margin-left:6px; }
+        .hero-tagline { font-size:18px; color:rgba(255,255,255,0.85); font-style:italic; margin-top:-8px; margin-bottom:18px; }
+        .features-section { max-width:1200px; margin:0 auto; padding:40px 30px; display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:24px; }
+        .feature-card { background:white; border-radius:20px; padding:30px; text-align:center; box-shadow:0 2px 12px rgba(0,0,0,.06); transition:transform .3s; }
+        .feature-card:hover { transform:translateY(-6px); box-shadow:0 12px 32px rgba(0,0,0,.1); }
+        .feature-icon { font-size:42px; margin-bottom:14px; }
+        .feature-card h3 { font-size:20px; font-weight:800; color:#111; margin-bottom:6px; }
+        .feature-card p { font-size:14px; color:#888; line-height:1.6; }
+        .hero-subtitle2 { font-size:14px; color:rgba(255,255,255,0.7); margin-top:-4px; margin-bottom:20px; }
+    </style>
+</head>
+<body>
+<nav class="navbar">
+    <div class="logo">Tourism<span>Dinner</span></div>
+    <div class="nav-links">
+        <a href="/">{{ t.home }}</a>
+        <a href="/admin">{{ t.admin }}</a>
+        <a href="/set_lang/ar" class="{{ 'lang-active' if lang == 'ar' }}">ع</a>
+        <a href="/set_lang/fr" class="{{ 'lang-active' if lang == 'fr' }}">FR</a>
+        <a href="/set_lang/en" class="{{ 'lang-active' if lang == 'en' }}">EN</a>
+    </div>
+</nav>
+<div class="hero">
+    <div class="overlay">
+        <h1>Tourism<span> Dinner</span></h1>
+        <p>{{ t.hero_subtitle }}</p>
+        <div class="hero-tagline">{{ t.hero_tagline }}</div>
+        <div class="hero-subtitle2">{{ t.hero_subtitle2 }}</div>
+        <form action="/search" class="search-bar hero-form">
+            <div class="search-advanced">
+                <input type="text" name="q" placeholder="{{ t.search_placeholder }}">
+                <select name="type">
+                    <option value="">{{ t.filter_type }}</option>
+                    <option value="Ville">{{ t.type_ville }}</option>
+                    <option value="Plage">{{ t.type_plage }}</option>
+                    <option value="Montagne">{{ t.type_montagne }}</option>
+                    <option value="Desert">{{ t.type_desert }}</option>
+                    <option value="Histoire">{{ t.type_histoire }}</option>
+                </select>
+                <select name="guide">
+                    <option value="">{{ t.filter_guide }}</option>
+                    {% for g in guides %}
+                    <option value="{{ g.id }}">{{ g.nom }} — {{ g.specialite }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit">{{ t.search_btn }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<h1 class="title-page">{{ t.destinations_title }}</h1>
+<div class="type-filters">
+    <a href="/" class="type-btn {{ 'active' if not request.args.get('type') }}">{{ t.voir_tous }}</a>
+    {% for type_name in types %}
+    <a href="/?type={{ type_name }}" class="type-btn {{ 'active' if request.args.get('type') == type_name }}">
+        {% if type_name == 'Ville' %}🏙️{% elif type_name == 'Plage' %}🏖️{% elif type_name == 'Montagne' %}⛰️{% elif type_name == 'Desert' %}🏜️{% elif type_name == 'Histoire' %}🏛️{% endif %}
+        {% if type_name == 'Desert' %}{{ t.type_desert }}
+        {% elif type_name == 'Plage' %}{{ t.type_plage }}
+        {% elif type_name == 'Montagne' %}{{ t.type_montagne }}
+        {% elif type_name == 'Histoire' %}{{ t.type_histoire }}
+        {% else %}{{ t.type_ville }}{% endif %}
+    </a>
+    {% endfor %}
+</div>
+<div id="results">
+    {% for ville in villes %}
+    <div class="card">
+        <div class="card-img-wrap">
+            <img src="{{ ville.image }}" alt="{{ ville.nom }}">
+        </div>
+        <div class="card-body">
+            <div class="card-header">
+                <h2 style="flex:1">{{ ville.nom }}</h2>
+                <a href="/favori/toggle/{{ ville.id }}" class="fav-btn {% if ville.id in fav_ids %}fav-active{% endif %}" title="{{ t.favorites }}" data-id="{{ ville.id }}">{% if ville.id in fav_ids %}❤️{% else %}🤍{% endif %}</a>
+            </div>
+            <span class="card-type" 
+                {% if ville.type == 'Desert' or ville.type == 'Désert' %}style="background:#fef9c3;color:#854d0e"
+                {% elif ville.type == 'Plage' %}style="background:#dbeafe;color:#1e40af"
+                {% elif ville.type == 'Montagne' %}style="background:#ffedd5;color:#9a3412"
+                {% elif ville.type == 'Histoire' %}style="background:#fce7f3;color:#9d174d"
+                {% endif %}>
+                {% if ville.type == 'Desert' or ville.type == 'Désert' %}{{ t.type_desert }}
+                {% elif ville.type == 'Plage' %}{{ t.type_plage }}
+                {% elif ville.type == 'Montagne' %}{{ t.type_montagne }}
+                {% elif ville.type == 'Histoire' %}{{ t.type_histoire }}
+                {% else %}{{ t.type_ville }}{% endif %}
+            </span>
+            {% if ville.note %}
+            <span class="rating-badge">⭐ {{ ville.note }}</span>
+            {% endif %}
+            <div style="font-size:12px;color:#aaa;margin:6px 0;">{{ ville.description[:80] if ville.description else '' }}...</div>
+            <a href="/details/{{ ville.id }}">{{ t.see_details }}</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% if guides %}
+<div class="guides-section">
+    <h2>👨‍🦱 {{ t.our_guides }}</h2>
+    <div class="guides-grid">
+        {% for g in guides %}
+        <div class="guide-card">
+            <img src="{{ g.image }}" alt="{{ g.nom }}">
+            <h4>{{ g.nom }}</h4>
+            <p>{{ g.specialite }}</p>
+            <div class="guide-price">{{ g.prix }}</div>
+            {% if g.telephone %}<p>📞 {{ g.telephone }}</p>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+<button class="scroll-top" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+<script>
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.fav-btn');
+    if (!btn) return;
+    e.preventDefault();
+    var id = btn.getAttribute('data-id');
+    fetch('/favori/toggle/' + id).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.is_fav) { btn.classList.add('fav-active'); btn.innerHTML = '❤️'; }
+        else { btn.classList.remove('fav-active'); btn.innerHTML = '🤍'; }
+    });
+});
+window.addEventListener('scroll', function() {
+    const btn = document.getElementById('scrollTopBtn');
+    if (btn) btn.classList.toggle('show', window.scrollY > 300);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ t.dashboard }} — Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .admin-page { display:flex; min-height:100vh; background:#f4f4f4; }
+        .admin-sidebar { width:250px; background:#0a0a0a; color:white; padding:28px 0; position:fixed; top:0; left:0; bottom:0; display:flex; flex-direction:column; z-index:100; }
+        .admin-sidebar .logo { padding:0 24px 28px; font-size:20px; font-weight:800; letter-spacing:-.5px; border-bottom:1px solid rgba(255,255,255,0.06); }
+        .admin-sidebar .logo span { color:#22c55e; }
+        .admin-sidebar .nav-item { display:flex; align-items:center; gap:12px; padding:14px 24px; color:rgba(255,255,255,0.5); text-decoration:none; font-size:14px; font-weight:600; transition:all .15s; border-left:3px solid transparent; }
+        .admin-sidebar .nav-item:hover { color:white; background:rgba(255,255,255,0.04); }
+        .admin-sidebar .nav-item.active { color:#22c55e; border-left-color:#22c55e; background:rgba(34,197,94,0.08); }
+        .admin-sidebar .nav-item.logout { margin-top:auto; color:#ef4444; }
+        .admin-sidebar .nav-item.logout:hover { background:rgba(239,68,68,0.08); }
+        .admin-main { margin-left:250px; flex:1; padding:30px 36px; }
+        .admin-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:30px; }
+        .admin-header h1 { font-size:28px; font-weight:800; color:#111; letter-spacing:-.5px; }
+        .admin-header h1 span { color:#22c55e; }
+        .admin-header .header-right { display:flex; align-items:center; gap:16px; }
+        .admin-header .lang-link { color:#888; text-decoration:none; font-size:13px; font-weight:700; padding:6px 12px; border-radius:8px; transition:all .15s; }
+        .admin-header .lang-link:hover { color:#22c55e; background:rgba(34,197,94,0.08); }
+        .admin-header .lang-link.active { color:#22c55e; background:rgba(34,197,94,0.1); }
+        .stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:30px; }
+        .stat-tile { background:white; border-radius:16px; padding:20px; box-shadow:0 1px 4px rgba(0,0,0,0.04); display:flex; align-items:center; gap:16px; transition:transform .15s,box-shadow .15s; }
+        .stat-tile:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.06); }
+        .stat-tile .st-icon { width:48px; height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+        .stat-tile .st-icon.green { background:#dcfce7; }
+        .stat-tile .st-icon.red { background:#fce7e7; }
+        .stat-tile .st-icon.blue { background:#dbeafe; }
+        .stat-tile .st-icon.purple { background:#f3e8ff; }
+        .stat-tile .st-icon.orange { background:#ffedd5; }
+        .stat-tile .st-icon.teal { background:#ccfbf1; }
+        .stat-tile .st-icon.pink { background:#fce7f3; }
+        .stat-tile .st-icon.amber { background:#fef9c3; }
+        .stat-tile .st-icon.indigo { background:#e0e7ff; }
+        .stat-tile .st-body { flex:1; }
+        .stat-tile .st-body .st-value { font-size:28px; font-weight:800; color:#111; line-height:1.2; }
+        .stat-tile .st-body .st-label { font-size:13px; color:#888; font-weight:500; margin-top:2px; }
+        .section-card { background:white; border-radius:16px; box-shadow:0 1px 4px rgba(0,0,0,0.04); margin-bottom:24px; overflow:hidden; }
+        .section-card .sc-header { display:flex; justify-content:space-between; align-items:center; padding:18px 24px; border-bottom:1px solid #f0f0f0; }
+        .section-card .sc-header h2 { font-size:17px; font-weight:800; color:#111; }
+        .section-card .sc-header .sc-count { font-size:13px; color:#888; font-weight:600; background:#f4f4f4; padding:4px 12px; border-radius:20px; }
+        .section-card .sc-body { padding:0; overflow-x:auto; }
+        .section-card table { width:100%; border-collapse:collapse; }
+        .section-card th { text-align:left; padding:12px 20px; font-size:12px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:.4px; background:#fafafa; border-bottom:1px solid #f0f0f0; }
+        .section-card td { padding:12px 20px; font-size:14px; color:#333; border-bottom:1px solid #f4f4f4; }
+        .section-card tr:last-child td { border-bottom:none; }
+        .section-card tr:hover td { background:#f8fdf8; }
+        .badge { display:inline-block; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:700; }
+        .badge-ville { background:#dcfce7; color:#166534; }
+        .badge-desert { background:#fef9c3; color:#854d0e; }
+        .badge-plage { background:#dbeafe; color:#1e40af; }
+        .badge-montagne { background:#ffedd5; color:#9a3412; }
+        .badge-histoire { background:#fce7f3; color:#9d174d; }
+        .btn-delete { color:#ef4444; font-weight:700; font-size:13px; text-decoration:none; padding:6px 14px; border-radius:8px; transition:all .15s; border:1.5px solid transparent; }
+        .btn-delete:hover { background:#fef2f2; border-color:#fecaca; }
+        .btn-add { display:inline-flex; align-items:center; gap:6px; padding:8px 18px; border-radius:10px; background:#22c55e; color:white; font-size:13px; font-weight:700; text-decoration:none; transition:all .15s; }
+        .btn-add:hover { background:#16a34a; transform:translateY(-1px); box-shadow:0 4px 12px rgba(34,197,94,0.25); }
+        .success-banner { background:#dcfce7; color:#166534; padding:14px 24px; border-radius:12px; font-weight:700; margin-bottom:20px; border:1px solid #bbf7d0; display:flex; align-items:center; gap:10px; }
+        .city-img { width:44px; height:32px; object-fit:cover; border-radius:8px; }
+        .admin-link { color:#22c55e; text-decoration:none; font-weight:600; }
+        .admin-link:hover { text-decoration:underline; }
+        .empty-state { text-align:center; padding:40px 20px; color:#aaa; font-size:14px; }
+    </style>
+</head>
+<body>
+<div class="admin-page">
+    <div class="admin-sidebar">
+        <div class="logo">Tourism<span>Dinner</span></div>
+        <a href="/admin" class="nav-item active">📊 {{ t.dashboard }}</a>
+        <a href="/admin/add_ville" class="nav-item">➕ {{ t.add_city }}</a>
+        <a href="/" class="nav-item">🏠 {{ t.home }}</a>
+        <a href="/logout" class="nav-item logout">🚪 {{ t.logout }}</a>
+    </div>
+    <div class="admin-main">
+        <div class="admin-header">
+            <h1>{{ t.dashboard }} <span>Admin</span></h1>
+            <div class="header-right">
+                <a href="/set_lang/ar" class="lang-link {{ 'active' if lang == 'ar' }}">ع</a>
+                <a href="/set_lang/fr" class="lang-link {{ 'active' if lang == 'fr' }}">FR</a>
+                <a href="/set_lang/en" class="lang-link {{ 'active' if lang == 'en' }}">EN</a>
+            </div>
+        </div>
+        {% if added %}
+        <div class="success-banner">✅ {{ t.city_added_success }}</div>
+        {% endif %}
+        <div class="stats-row">
+            <div class="stat-tile">
+                <div class="st-icon green">🏙️</div>
+                <div class="st-body"><div class="st-value">{{ total_villes }}</div><div class="st-label">{{ t.total_destinations }}</div></div>
+            </div>
+            <div class="stat-tile">
+                <div class="st-icon red">📋</div>
+                <div class="st-body"><div class="st-value">{{ total_reservations }}</div><div class="st-label">{{ t.total_reservations }}</div></div>
+            </div>
+            <div class="stat-tile">
+                <div class="st-icon blue">🏛️</div>
+                <div class="st-body"><div class="st-value">{{ villes_actives }}</div><div class="st-label">{{ t.active_cities }}</div></div>
+            </div>
+            <div class="stat-tile">
+                <div class="st-icon purple">👥</div>
+                <div class="st-body"><div class="st-value">{{ total_personnes }}</div><div class="st-label">{{ t.total_persons }}</div></div>
+            </div>
+            <div class="stat-tile">
+                <div class="st-icon orange">🎯</div>
+                <div class="st-body"><div class="st-value">{{ total_attractions }}</div><div class="st-label">{{ t.total_attractions }}</div></div>
+            </div>
+            <div class="stat-tile">
+                <div class="st-icon teal">👑</div>
+                <div class="st-body"><div class="st-value">{{ top_ville }}</div><div class="st-label">{{ t.top_ville }}</div></div>
+            </div>
+            <div class="stat-tile">
+                <div class="st-icon pink">📊</div>
+                <div class="st-body"><div class="st-value">{{ avg_personnes }}</div><div class="st-label">{{ t.avg_personnes }}</div></div>
+            </div>
+            <div class="stat-tile">
+                <div class="st-icon amber">📅</div>
+                <div class="st-body"><div class="st-value">{{ today_reservations }}</div><div class="st-label">{{ t.today_reservations }}</div></div>
+            </div>
+            <div class="stat-tile">
+                <div class="st-icon indigo">🎟️</div>
+                <div class="st-body"><div class="st-value">{{ total_attraction_reservations }}</div><div class="st-label">{{ t.attraction_reservations }}</div></div>
+            </div>
+        </div>
+        <div class="section-card">
+            <div class="sc-header">
+                <h2>🏙️ {{ t.total_destinations }}</h2>
+                <a href="/admin/add_ville" class="btn-add">➕ {{ t.add_city }}</a>
+            </div>
+            <div class="sc-body">
+                <table>
+                    <thead><tr><th>#</th><th></th><th>{{ t.city_name }}</th><th>{{ t.type }}</th><th></th></tr></thead>
+                    <tbody>
+                    {% for v in villes %}
+                        <tr>
+                            <td style="color:#999;font-size:13px;">{{ v.id }}</td>
+                            <td><img src="{{ v.image }}" class="city-img" alt="{{ v.nom }}"></td>
+                            <td><strong>{{ v.nom }}</strong></td>
+                            <td>{% if v.type == 'Desert' or v.type == 'Désert' %}<span class="badge badge-desert">{{ t.type_desert }}</span>{% elif v.type == 'Plage' %}<span class="badge badge-plage">{{ t.type_plage }}</span>{% elif v.type == 'Montagne' %}<span class="badge badge-montagne">{{ t.type_montagne }}</span>{% elif v.type == 'Histoire' %}<span class="badge badge-histoire">{{ t.type_histoire }}</span>{% else %}<span class="badge badge-ville">{{ t.type_ville }}</span>{% endif %}</td>
+                            <td><a href="/admin/delete_ville/{{ v.id }}" class="btn-delete" onclick="return confirm('{{ t.delete }} «{{ v.nom }}»?')">{{ t.delete }}</a></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="section-card">
+            <div class="sc-header">
+                <h2>📋 {{ t.reservations_list }}</h2>
+                <span class="sc-count">{{ reservations|length }}</span>
+            </div>
+            <div class="sc-body">
+                {% if reservations %}
+                <table>
+                    <thead><tr><th>#</th><th>{{ t.client_name }}</th><th>{{ t.city }}</th><th>{{ t.departure }}</th><th>{{ t.persons }}</th><th>{{ t.type }}</th><th></th></tr></thead>
+                    <tbody>
+                    {% for r in reservations %}
+                        <tr>
+                            <td style="color:#999;font-size:13px;">{{ r.id }}</td>
+                            <td><strong>{{ r.nom_client }}</strong></td>
+                            <td>{{ r.ville }}</td>
+                            <td style="color:#888;font-size:13px;">{{ r.date_depart }}</td>
+                            <td>{{ r.personnes }}</td>
+                            <td>{% if r.type == 'Ville' or r.type == 'ville' %}<span class="badge badge-ville">{{ t.type_ville }}</span>{% elif r.type == 'Désert' or r.type == 'Desert' or r.type == 'desert' %}<span class="badge badge-desert">{{ t.type_desert }}</span>{% elif r.type == 'Plage' or r.type == 'plage' %}<span class="badge badge-plage">{{ t.type_plage }}</span>{% elif r.type == 'Montagne' or r.type == 'montagne' %}<span class="badge badge-montagne">{{ t.type_montagne }}</span>{% elif r.type == 'Histoire' or r.type == 'histoire' %}<span class="badge badge-histoire">{{ t.type_histoire }}</span>{% else %}<span class="badge">{{ r.type }}</span>{% endif %}</td>
+                            <td><a href="/admin/delete/{{ r.id }}" class="btn-delete" onclick="return confirm('{{ t.delete }}?')">{{ t.delete }}</a></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}<div class="empty-state">{{ t.no_results }}</div>{% endif %}
+            </div>
+        </div>
+        <div class="section-card">
+            <div class="sc-header">
+                <h2>🎟️ {{ t.attraction_reservations }}</h2>
+                <span class="sc-count">{{ attraction_reservations|length }}</span>
+            </div>
+            <div class="sc-body">
+                {% if attraction_reservations %}
+                <table>
+                    <thead><tr><th>#</th><th>{{ t.attraction_name }}</th><th>{{ t.client }}</th><th>{{ t.email }}</th><th>{{ t.telephone }}</th><th>{{ t.departure }}</th><th>{{ t.persons }}</th><th>{{ t.details_col }}</th><th>{{ t.type }}</th></tr></thead>
+                    <tbody>
+                    {% for ar in attraction_reservations %}
+                        <tr>
+                            <td style="color:#999;font-size:13px;">{{ ar.id }}</td>
+                            <td><strong>{{ ar.attraction_nom }}</strong></td>
+                            <td>{{ ar.nom_client }}</td>
+                            <td style="font-size:13px;color:#888;">{{ ar.email }}</td>
+                            <td style="font-size:13px;">{{ ar.telephone }}</td>
+                            <td style="font-size:13px;color:#888;">{{ ar.date_depart }}</td>
+                            <td>{{ ar.personnes }}</td>
+                            <td style="font-size:13px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{% if ar.details %}{{ ar.details }}{% else %}—{% endif %}</td>
+                            <td>{% if ar.categorie == 'restaurant' %}<span class="badge badge-ville">{{ t.restaurants }}</span>{% elif ar.categorie == 'hotel' %}<span class="badge badge-plage">{{ t.hotels }}</span>{% elif ar.categorie == 'musee' %}<span class="badge badge-histoire">{{ t.museums }}</span>{% elif ar.categorie == 'pharmacie' %}<span class="badge badge-desert">{{ t.pharmacies }}</span>{% elif ar.categorie == 'lieu' %}<span class="badge badge-montagne">{{ t.places }}</span>{% else %}<span class="badge">—</span>{% endif %}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}<div class="empty-state">{{ t.no_results }}</div>{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
